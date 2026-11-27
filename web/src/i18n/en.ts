@@ -2424,6 +2424,11 @@ export const en = {
   "clusterBackups.regionHint": "us-east-1 when left empty.",
   "clusterBackups.accessKey": "Access key ID",
   "clusterBackups.secretKey": "Secret access key",
+  "s3d.caCert": "CA certificate",
+  "s3d.caCertHint":
+    "Only for a store whose certificate your own CA signs, such as a self-hosted MinIO. Paste the CA in PEM.",
+  "s3d.ownCa": "Own CA",
+  "clusterBackups.keepCa": "Leave empty to keep the CA the location trusts.",
   "clusterBackups.keepKeys": "Leave both empty to keep the keys it has.",
   "clusterBackups.status": "Status",
   "clusterBackups.phase.available": "Reachable",

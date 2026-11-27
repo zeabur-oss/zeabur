@@ -89,6 +89,7 @@ describe("the location form", () => {
       endpoint: "https://s3.example.com/",
       accessKeyId: " id ",
       secretAccessKey: "secret",
+      caCert: "",
     })
     expect(request).toMatchObject({
       op: "location",
@@ -97,6 +98,19 @@ describe("the location form", () => {
       endpoint: "https://s3.example.com",
       accessKeyId: "id",
     })
+  })
+
+  test("typed keys send a CA only when one is given, and a destination sends its own", () => {
+    const typed = { ...locationForm(location()), caCert: " -----BEGIN CERTIFICATE----- " }
+    expect(locationRequest(typed)).toMatchObject({ caCert: "-----BEGIN CERTIFICATE-----" })
+    expect(locationRequest({ ...typed, caCert: " " })).not.toHaveProperty(
+      "caCert",
+      expect.anything(),
+    )
+    expect(locationRequest({ ...typed, destination: "r2" })).not.toHaveProperty(
+      "caCert",
+      expect.anything(),
+    )
   })
 
   test("a Service or a single-label host is inside the cluster", () => {

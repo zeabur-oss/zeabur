@@ -5270,13 +5270,21 @@ components:
             type: string
             description: The bucket.
             pattern: ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$
+          caCert:
+            type:
+            - string
+            - "null"
+            description: |-
+              The CA certificates in PEM that the store's certificate chains to; empty to trust the
+              system's, absent to keep what the location trusts.
+            maxLength: 65536
           destination:
             type:
             - string
             - "null"
             description: |-
               An S3 destination of the cluster's list to copy the keys from, instead of the keys
-              given.
+              given. Its CA certificates replace `caCert`.
           endpoint:
             type: string
             description: The S3-compatible endpoint, `https://…`; empty for AWS S3.
@@ -17776,11 +17784,17 @@ components:
       - bucket
       - region
       - prefix
+      - caCert
       - origin
       properties:
         bucket:
           type: string
           description: The bucket.
+        caCert:
+          type: string
+          description: |-
+            The CA certificates, in PEM, that the store's certificate chains to; empty to trust the
+            system's.
         endpoint:
           type: string
           description: The S3-compatible endpoint, `https://…`.
@@ -17811,6 +17825,12 @@ components:
           type: string
           description: The bucket.
           pattern: ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$
+        caCert:
+          type: string
+          description: |-
+            The CA certificates in PEM that the store's certificate chains to, such as a self-hosted
+            `MinIO`'s own CA; empty to trust the system's.
+          maxLength: 65536
         endpoint:
           type: string
           description: The S3-compatible endpoint, `https://…`.
@@ -20184,6 +20204,13 @@ components:
         bucket:
           type: string
           description: The bucket.
+        caCertRef:
+          type:
+          - string
+          - "null"
+          description: |-
+            The Secret holding the CA certificates it trusts for the store (`caCertRef`); absent when
+            it trusts the system's.
         credential:
           type:
           - string

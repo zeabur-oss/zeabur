@@ -943,8 +943,15 @@ export type BackupsPlanRequest =
        */
       bucket: string
       /**
+       * The CA certificates in PEM that the store's certificate chains to; empty to trust the
+       * system's, absent to keep what the location trusts.
+       * @maxLength 65536
+       * @nullable
+       */
+      caCert?: string | null
+      /**
        * An S3 destination of the cluster's list to copy the keys from, instead of the keys
-       * given.
+       * given. Its CA certificates replace `caCert`.
        * @nullable
        */
       destination?: string | null
@@ -2987,6 +2994,12 @@ export const VeleroLocationPhase = {
 export type VeleroLocation = {
   /** The bucket. */
   bucket: string
+  /**
+   * The Secret holding the CA certificates it trusts for the store (`caCertRef`); absent when
+   * it trusts the system's.
+   * @nullable
+   */
+  caCertRef?: string | null
   /**
    * The Secret holding its keys; absent when it uses Velero's own.
    * @nullable
@@ -10603,6 +10616,11 @@ export type RuntimeAlerts = {
 export type S3Destination = {
   /** The bucket. */
   bucket: string
+  /**
+   * The CA certificates, in PEM, that the store's certificate chains to; empty to trust the
+   * system's.
+   */
+  caCert: string
   /** The S3-compatible endpoint, `https://…`. */
   endpoint: string
   /** Its name. */
@@ -10626,6 +10644,12 @@ export type S3DestinationFields = {
    * @pattern ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$
    */
   bucket: string
+  /**
+   * The CA certificates in PEM that the store's certificate chains to, such as a self-hosted
+   * `MinIO`'s own CA; empty to trust the system's.
+   * @maxLength 65536
+   */
+  caCert?: string
   /** The S3-compatible endpoint, `https://…`. */
   endpoint: string
   /**

@@ -2234,6 +2234,11 @@ export const zhTW: Messages = {
   "clusterBackups.regionHint": "留白時使用 us-east-1。",
   "clusterBackups.accessKey": "存取金鑰 ID",
   "clusterBackups.secretKey": "私密存取金鑰",
+  "s3d.caCert": "CA 憑證",
+  "s3d.caCertHint":
+    "只有憑證由你自己的 CA 簽發的儲存空間才需要，例如自架的 MinIO。貼上 PEM 格式的 CA。",
+  "s3d.ownCa": "自有 CA",
+  "clusterBackups.keepCa": "留白就沿用存放位置目前信任的 CA。",
   "clusterBackups.keepKeys": "兩個都留白就沿用目前的金鑰。",
   "clusterBackups.status": "狀態",
   "clusterBackups.phase.available": "可連線",

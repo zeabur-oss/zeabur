@@ -27,6 +27,7 @@ import { Section } from "@/routes/cluster/section"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Input } from "@zeabur-oss/design-system/components/input"
+import { Textarea } from "@zeabur-oss/design-system/components/textarea"
 
 type Request = Schemas.S3DestinationsPlanRequest
 type Planned = { request: Request; title: string; destructive?: boolean }
@@ -115,7 +116,14 @@ function DestinationRow({
           {destination.name}
         </span>
         <span className="truncate type-meta text-muted-foreground" translate="no">
-          {[where, destination.endpoint, destination.region].filter(Boolean).join(t("common.sep"))}
+          {[
+            where,
+            destination.endpoint,
+            destination.region,
+            destination.caCert ? t("s3d.ownCa") : "",
+          ]
+            .filter(Boolean)
+            .join(t("common.sep"))}
         </span>
       </div>
       <GateTip gate={gate}>
@@ -140,7 +148,7 @@ type Label =
   | "clusterBackups.accessKey"
 
 const fields: {
-  key: keyof DestinationForm
+  key: Exclude<keyof DestinationForm, "caCert">
   label: Label
   problem?: DestinationProblem
   placeholder?: string
@@ -216,6 +224,7 @@ function DestinationEditor({
             {input(f.key, f.placeholder)}
           </FormField>
         ))}
+        <CaField value={form.caCert} onChange={(caCert) => setForm((f) => ({ ...f, caCert }))} />
         <FormField
           label={t("clusterBackups.secretKey")}
           hint={editing ? t("clusterBackups.keepKeys") : undefined}
@@ -233,6 +242,33 @@ function DestinationEditor({
         <button type="submit" hidden />
       </ReviewForm>
     </FormDrawer>
+  )
+}
+
+/** The CA certificates of a store whose certificate a private CA signs, such as a self-hosted
+ * MinIO's. */
+export function CaField({
+  value,
+  hint,
+  onChange,
+}: {
+  value: string
+  hint?: string
+  onChange: (value: string) => void
+}) {
+  const t = useT()
+  return (
+    <FormField label={t("s3d.caCert")} hint={hint ?? t("s3d.caCertHint")}>
+      <Textarea
+        rows={3}
+        size="sm"
+        mono
+        value={value}
+        placeholder="-----BEGIN CERTIFICATE-----"
+        autoComplete="off"
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </FormField>
   )
 }
 

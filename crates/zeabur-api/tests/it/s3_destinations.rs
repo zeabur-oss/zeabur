@@ -208,6 +208,62 @@ mod tests {
         assert_eq!(found["keysFrom"], "r2", "{found}");
     }
 
+    #[tokio::test]
+    async fn a_velero_location_trusts_the_ca_of_its_destination_until_it_has_none() {
+        const CA: &str =
+            "-----BEGIN CERTIFICATE-----\nMIIBszCCAVmgAwIBAgIUQ\n-----END CERTIFICATE-----";
+        let cluster = cluster();
+        let app = app(&cluster);
+        register(&app).await;
+        let save = |ca: &str| {
+            json!({"op": "save", "name": "r2", "endpoint": "https://minio.lan",
+                "bucket": "backups", "caCert": ca})
+        };
+        let (status, problem) =
+            send(&app, "POST", &format!("{BASE}/plan"), Some(&save("pem"))).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        applied(&app, BASE, &save(CA)).await;
+        let (_, found) = send(&app, "GET", BASE, None).await;
+        assert_eq!(found["items"][0]["caCert"], CA);
+
+        let location = json!({"op": "location", "bucket": "backups",
+            "endpoint": "https://minio.lan", "destination": "r2"});
+        let backups = "/api/v1/cluster/backups";
+        let (_, done) = applied(&app, backups, &location).await;
+        assert!(
+            done["written"]
+                .to_string()
+                .contains("Secret/zeabur-backup-ca"),
+            "{done}"
+        );
+        let ca = cluster
+            .inspect(|s| s.secret_values["velero/zeabur-backup-ca"]["ca.crt"].clone())
+            .unwrap();
+        assert_eq!(String::from_utf8(ca).unwrap(), CA);
+        let (_, found) = send(&app, "GET", backups, None).await;
+        assert_eq!(
+            found["locations"][0]["caCertRef"], "zeabur-backup-ca",
+            "{found}"
+        );
+
+        applied(&app, BASE, &save("")).await;
+        applied(&app, backups, &location).await;
+        let (_, found) = send(&app, "GET", backups, None).await;
+        assert!(found["locations"][0].get("caCertRef").is_none(), "{found}");
+    }
+
+    #[tokio::test]
+    async fn a_velero_location_from_keys_refuses_what_is_not_a_certificate() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        let request = json!({"op": "location", "bucket": "backups",
+            "endpoint": "https://minio.lan", "accessKeyId": "AKIA1",
+            "secretAccessKey": SECRET_KEY, "caCert": "-----BEGIN PRIVATE KEY-----"});
+        let (status, problem) =
+            send(&app, "POST", "/api/v1/cluster/backups/plan", Some(&request)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+    }
+
     async fn copied_twice(app: &Router) {
         register(app).await;
         applied(app, "/api/v1/projects/shop", &copy("db-backups-s3")).await;

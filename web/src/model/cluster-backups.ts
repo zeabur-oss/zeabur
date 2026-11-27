@@ -49,7 +49,9 @@ export interface LocationForm {
   endpoint: string
   accessKeyId: string
   secretAccessKey: string
-  /** The S3 destination whose keys the plan copies; typed keys when absent. */
+  /** CA certificates in PEM with typed keys; empty keeps what the location trusts. */
+  caCert: string
+  /** The S3 destination whose keys and CA the plan copies; typed keys when absent. */
   destination?: string
 }
 
@@ -64,6 +66,7 @@ export const pickLocation = (destination?: Destination): Partial<LocationForm> =
         prefix: joinFolder(destination.prefix, "velero"),
         accessKeyId: "",
         secretAccessKey: "",
+        caCert: "",
       }
     : { destination: undefined }
 
@@ -75,6 +78,7 @@ export function locationForm(location: Location | undefined): LocationForm {
     endpoint: location?.endpoint ?? "",
     accessKeyId: "",
     secretAccessKey: "",
+    caCert: "",
   }
 }
 
@@ -109,6 +113,7 @@ export function locationRequest(form: LocationForm): Schemas.BackupsPlanRequest 
     accessKeyId: form.accessKeyId.trim(),
     secretAccessKey: form.secretAccessKey.trim(),
     destination: form.destination,
+    caCert: form.destination === undefined && form.caCert.trim() ? form.caCert.trim() : undefined,
   }
 }
 

@@ -86,6 +86,7 @@ export interface DestinationForm {
   bucket: string
   region: string
   prefix: string
+  caCert: string
   accessKeyId: string
   secretAccessKey: string
 }
@@ -96,6 +97,7 @@ export const destinationForm = (destination?: Destination): DestinationForm => (
   bucket: destination?.bucket ?? "",
   region: destination?.region ?? "",
   prefix: destination?.prefix ?? "",
+  caCert: destination?.caCert ?? "",
   accessKeyId: "",
   secretAccessKey: "",
 })
@@ -128,6 +130,7 @@ export const saveRequest = (
   bucket: form.bucket.trim(),
   region: form.region.trim(),
   prefix: form.prefix.trim(),
+  caCert: form.caCert.trim(),
   accessKeyId: form.accessKeyId.trim(),
   secretAccessKey: form.secretAccessKey.trim(),
 })

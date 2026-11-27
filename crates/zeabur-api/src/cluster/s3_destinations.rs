@@ -8,7 +8,8 @@
 //! | `POST /api/v1/cluster/s3-destinations/apply` | carries out that plan by its token |
 //!
 //! A destination is two objects named after it in the namespace [`NAMESPACE`], both labelled
-//! [`LABEL`]: a ConfigMap with the endpoint, the bucket, the region and the folder, and a Secret
+//! [`LABEL`]: a ConfigMap with the endpoint, the bucket, the region, the folder and the CA
+//! certificates of a store whose certificate a private CA signs, and a Secret
 //! with the keys (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`). Everything is read and written as
 //! the person, so RBAC in that namespace decides who may register a destination and who may use
 //! its keys. Zeabur's chart lets everyone signed in read the ConfigMaps there, and nobody the
@@ -47,7 +48,7 @@ use zeabur_kube::{
     WriteRequest,
 };
 use zeabur_model::Origin;
-use zeabur_model::kernel::s3::is_bucket_name;
+use zeabur_model::kernel::s3::{is_bucket_name, is_ca_bundle};
 use zeabur_modules::velero::cluster as v;
 use zeabur_plan::{Change, CopyS3KeysChange, DataEdit, DataKind, PlanRequest};
 
@@ -70,6 +71,7 @@ pub const KEYS: &str = "zeabur.com/s3-destination-keys";
 const ACCESS_KEY_ID: &str = "AWS_ACCESS_KEY_ID";
 const SECRET_ACCESS_KEY: &str = "AWS_SECRET_ACCESS_KEY";
 const PREFIX: &str = "s3d1.";
+const CA_CERT: &str = "caCert";
 const HIDDEN: &str = "(hidden)";
 
 /// The cluster's S3 destinations.
@@ -102,6 +104,9 @@ pub struct S3Destination {
     pub region: String,
     /// A folder in the bucket that backups go under; empty for the bucket's root.
     pub prefix: String,
+    /// The CA certificates, in PEM, that the store's certificate chains to; empty to trust the
+    /// system's.
+    pub ca_cert: String,
     /// The ConfigMap.
     pub origin: Origin,
 }
@@ -124,6 +129,11 @@ pub struct S3DestinationFields {
     /// A folder in the bucket.
     #[serde(default)]
     pub prefix: String,
+    /// The CA certificates in PEM that the store's certificate chains to, such as a self-hosted
+    /// `MinIO`'s own CA; empty to trust the system's.
+    #[serde(default)]
+    #[schema(max_length = 65536)]
+    pub ca_cert: String,
     /// The access key ID; empty with the secret to keep the keys the destination has.
     #[serde(default)]
     pub access_key_id: String,
@@ -294,6 +304,7 @@ fn destination(object: &DynamicObject) -> Option<S3Destination> {
         bucket: text(object, "bucket"),
         region: text(object, "region"),
         prefix: text(object, "prefix"),
+        ca_cert: text(object, CA_CERT),
         origin: Origin::complete("v1", "ConfigMap", Some(NAMESPACE), &name),
         name,
     })
@@ -364,6 +375,33 @@ pub(crate) async fn keys(cluster: &dyn Cluster, name: &str) -> Result<(String, S
                 "S3 destination {name} has no keys. Add them on the cluster's Backups page."
             ))
         })
+}
+
+/// The CA certificates of destination `name`, read as the person; empty when it trusts the
+/// system's.
+///
+/// # Errors
+///
+/// `403` naming the read when the person may not read the destination, `404` when it does not
+/// exist.
+pub(crate) async fn ca_cert(cluster: &dyn Cluster, name: &str) -> Result<String, ApiError> {
+    let found = cluster
+        .find_object(&resource("ConfigMap"), Some(NAMESPACE), name)
+        .await
+        .map_err(|e| {
+            read_problem(
+                e,
+                &format!("S3 destination {name}"),
+                get_read("", "configmaps", Some(NAMESPACE), name),
+            )
+        })?;
+    let object = found.filter(|o| labelled(&o.metadata)).ok_or_else(|| {
+        ApiError::from(Problem::new(
+            Kind::NotFound,
+            format!("There is no S3 destination named {name}."),
+        ))
+    })?;
+    Ok(text(&object, CA_CERT))
 }
 
 /// The destination a Secret's keys were copied from, by its label.
@@ -727,10 +765,16 @@ fn fields_problem(fields: &S3DestinationFields) -> Option<&'static str> {
         Some("A bucket name has 3 to 63 lower-case letters, digits, dots and -.")
     } else if fields.prefix.contains("..") || fields.prefix.contains(char::is_whitespace) {
         Some("A folder has no spaces and no ..")
+    } else if !fields.ca_cert.trim().is_empty() && !is_ca_bundle(&fields.ca_cert) {
+        Some(CA_PROBLEM)
     } else {
         None
     }
 }
+
+/// Why a CA bundle is refused, in words for the person.
+pub(crate) const CA_PROBLEM: &str = "A CA certificate is one or more PEM blocks that start with \
+     -----BEGIN CERTIFICATE-----, 64 KiB at most.";
 
 fn meta(name: &str) -> ObjectMeta {
     ObjectMeta {
@@ -748,11 +792,15 @@ fn config_map(fields: &S3DestinationFields) -> ConfigMap {
     ]);
     let region = fields.region.trim();
     let prefix = fields.prefix.trim().trim_matches('/');
+    let ca_cert = fields.ca_cert.trim();
     if !region.is_empty() {
         data.insert("region", region);
     }
     if !prefix.is_empty() {
         data.insert("prefix", prefix);
+    }
+    if !ca_cert.is_empty() {
+        data.insert(CA_CERT, ca_cert);
     }
     ConfigMap {
         metadata: meta(&fields.name),
@@ -1295,6 +1343,7 @@ mod tests {
             bucket: bucket.to_owned(),
             region: String::new(),
             prefix: String::new(),
+            ca_cert: String::new(),
             access_key_id: String::new(),
             secret_access_key: String::new(),
         };

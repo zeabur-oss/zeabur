@@ -2230,6 +2230,11 @@ export const zhCN: Messages = {
   "clusterBackups.regionHint": "留空时使用 us-east-1。",
   "clusterBackups.accessKey": "访问密钥 ID",
   "clusterBackups.secretKey": "私密访问密钥",
+  "s3d.caCert": "CA 证书",
+  "s3d.caCertHint":
+    "只有证书由你自己的 CA 签发的存储才需要，例如自建的 MinIO。粘贴 PEM 格式的 CA。",
+  "s3d.ownCa": "自有 CA",
+  "clusterBackups.keepCa": "留空就沿用存放位置当前信任的 CA。",
   "clusterBackups.keepKeys": "两个都留空就沿用当前的密钥。",
   "clusterBackups.status": "状态",
   "clusterBackups.phase.available": "可访问",

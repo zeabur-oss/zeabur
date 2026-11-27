@@ -61,7 +61,7 @@ import {
 import { BackupCoverage } from "@/routes/cluster/backup-coverage"
 import { ClusterFrame } from "@/routes/cluster/frame"
 import { Forbidden, type Role } from "@/routes/cluster/forbidden"
-import { S3DestinationsSection } from "@/routes/cluster/s3-destinations"
+import { CaField, S3DestinationsSection } from "@/routes/cluster/s3-destinations"
 import { FormButtons, Section } from "@/routes/cluster/section"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
@@ -261,42 +261,7 @@ function LocationSection({ data, gate, onPlan }: { data: Data; gate: Gate; onPla
         ) : null
       }
     >
-      {location && !editing ? (
-        <>
-          <Rows>
-            <Row label={t("clusterBackups.bucket")}>
-              <span className="min-w-0 truncate type-mono" translate="no">
-                {location.prefix ? `${location.bucket}/${location.prefix}` : location.bucket}
-              </span>
-            </Row>
-            <Row label={t("clusterBackups.endpoint")}>
-              <span className="min-w-0 truncate type-mono" translate="no">
-                {location.endpoint ?? t("clusterBackups.awsS3")}
-              </span>
-              {location.region ? (
-                <span className="type-meta text-muted-foreground" translate="no">
-                  {location.region}
-                </span>
-              ) : null}
-            </Row>
-            <Row label={t("clusterBackups.status")}>
-              <StatusPill health={phaseHealth[location.phase]} size="sm">
-                {t(`clusterBackups.phase.${location.phase}`)}
-              </StatusPill>
-              {location.lastValidatedAt ? (
-                <span className="type-meta text-muted-foreground">
-                  {t("clusterBackups.checked")} <Ago iso={location.lastValidatedAt} />
-                </span>
-              ) : null}
-            </Row>
-            <KeysFrom name={data.keysFrom} />
-          </Rows>
-          {location.phase === "unavailable" && location.message ? (
-            <p className="type-meta break-words text-muted-foreground">{location.message}</p>
-          ) : null}
-          {location.endpoint && insideCluster(location.endpoint) ? <InsideWarning /> : null}
-        </>
-      ) : null}
+      {location && !editing ? <LocationView location={location} keysFrom={data.keysFrom} /> : null}
       {form ? (
         <LocationEditor
           editing={location !== undefined}
@@ -310,6 +275,74 @@ function LocationSection({ data, gate, onPlan }: { data: Data; gate: Gate; onPla
         />
       ) : null}
     </Section>
+  )
+}
+
+function LocationView({
+  location,
+  keysFrom,
+}: {
+  location: Schemas.VeleroLocation
+  keysFrom?: string | null
+}) {
+  const t = useT()
+  return (
+    <>
+      <Rows>
+        <Row label={t("clusterBackups.bucket")}>
+          <span className="min-w-0 truncate type-mono" translate="no">
+            {location.prefix ? `${location.bucket}/${location.prefix}` : location.bucket}
+          </span>
+        </Row>
+        <Row label={t("clusterBackups.endpoint")}>
+          <span className="min-w-0 truncate type-mono" translate="no">
+            {location.endpoint ?? t("clusterBackups.awsS3")}
+          </span>
+          {location.region ? (
+            <span className="type-meta text-muted-foreground" translate="no">
+              {location.region}
+            </span>
+          ) : null}
+        </Row>
+        <Row label={t("clusterBackups.status")}>
+          <StatusPill health={phaseHealth[location.phase]} size="sm">
+            {t(`clusterBackups.phase.${location.phase}`)}
+          </StatusPill>
+          {location.lastValidatedAt ? (
+            <span className="type-meta text-muted-foreground">
+              {t("clusterBackups.checked")} <Ago iso={location.lastValidatedAt} />
+            </span>
+          ) : null}
+        </Row>
+        <CaFrom name={location.caCertRef} />
+        <KeysFrom name={keysFrom} />
+      </Rows>
+      <LocationNotes location={location} />
+    </>
+  )
+}
+
+function CaFrom({ name }: { name?: string | null }) {
+  const t = useT()
+  if (!name) return null
+  return (
+    <Row label={t("s3d.caCert")}>
+      <span className="min-w-0 truncate type-mono" translate="no">
+        {name}
+      </span>
+    </Row>
+  )
+}
+
+/** Why Velero cannot reach the location, and a store inside the cluster. */
+function LocationNotes({ location }: { location: Schemas.VeleroLocation }) {
+  return (
+    <>
+      {location.phase === "unavailable" && location.message ? (
+        <p className="type-meta break-words text-muted-foreground">{location.message}</p>
+      ) : null}
+      {location.endpoint && insideCluster(location.endpoint) ? <InsideWarning /> : null}
+    </>
   )
 }
 
@@ -437,6 +470,13 @@ function LocationEditor({
           <Input {...text("region", "us-east-1")} />
         </FormField>
       </div>
+      {form.destination === undefined ? (
+        <CaField
+          value={form.caCert}
+          hint={editing ? t("clusterBackups.keepCa") : undefined}
+          onChange={(caCert) => set({ caCert })}
+        />
+      ) : null}
       <FormButtons gate={gate} onCancel={onCancel} />
     </form>
   )
