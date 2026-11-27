@@ -605,10 +605,7 @@ impl BuildInput {
     }
 
     const fn builder_ref(&self) -> &'static str {
-        match self.method {
-            BuildMethod::Railpack => "railpack",
-            BuildMethod::Dockerfile => "dockerfile",
-        }
+        self.method.builder_ref()
     }
 
     /// `spec.source` of the `Build` `name`, and the credentials Secret it reads, if any.
@@ -800,7 +797,8 @@ impl<'a> Planner<'a> {
             registry: None,
             security: change.security.unwrap_or(match change.build.method {
                 BuildMethod::Railpack => PodSecurityLevel::Restricted,
-                BuildMethod::Dockerfile => PodSecurityLevel::Baseline,
+                // The image's user is not known before the model writes the Dockerfile.
+                BuildMethod::Dockerfile | BuildMethod::Agent => PodSecurityLevel::Baseline,
             }),
             command: Vec::new(),
             args: Vec::new(),

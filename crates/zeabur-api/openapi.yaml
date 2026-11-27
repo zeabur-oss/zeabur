@@ -4571,6 +4571,63 @@ components:
           description: >-
             The kinds of its diagnoses this incident explains, sorted; empty when it shows
             none yet.
+    AgentBuilder:
+      type: object
+      description: "The `agent` `ClusterBuilder`: whether it builds, and how its runs sign in to the model."
+      required:
+      - ready
+      properties:
+        credential:
+          oneOf:
+          - $ref: "#/components/schemas/AgentCredential"
+            description: What each project whose services build with it needs, to sign in to the model.
+          - type: "null"
+        model:
+          type:
+          - string
+          - "null"
+          description: The model, such as `claude-opus-5-5`.
+        provider:
+          type:
+          - string
+          - "null"
+          description: The model provider, such as `anthropic`.
+        ready:
+          type: boolean
+          description: Its `Ready` condition is `True`.
+    AgentCredential:
+      oneOf:
+      - type: object
+        description: A Secret with the API key.
+        required:
+        - name
+        - key
+        - type
+        properties:
+          key:
+            type: string
+            description: Its key.
+          name:
+            type: string
+            description: The Secret.
+          type:
+            type: string
+            enum:
+            - secret
+      - type: object
+        description: A ServiceAccount whose token the provider exchanges for an access token.
+        required:
+        - name
+        - type
+        properties:
+          name:
+            type: string
+            description: The ServiceAccount.
+          type:
+            type: string
+            enum:
+            - serviceAccount
+      description: What a project needs for the `agent` builder's runs to sign in to the model.
     AlertmanagerChannel:
       type: object
       description: One channel, without its secrets.
@@ -5494,6 +5551,7 @@ components:
       enum:
       - railpack
       - dockerfile
+      - agent
     BuildOptionsChange:
       type: object
       description: A [`Change::BuildOptions`]. A field left out stays as it is.
@@ -5526,6 +5584,19 @@ components:
           description: |-
             The build variables to set or remove, `spec.env`. A value from a Secret names only
             `secretName` and `key`.
+        freshPlan:
+          type:
+          - boolean
+          - "null"
+          description: |-
+            For [`BuildMethod::Agent`]: `true` has every run ask the model for a new Dockerfile
+            instead of building the one it saved (the `builder.zeabur.com/plan: fresh` annotation),
+            `false` goes back to the saved one.
+        method:
+          oneOf:
+          - $ref: "#/components/schemas/BuildMethod"
+            description: How it builds, `spec.builderRef`.
+          - type: "null"
     BuildSettings:
       type: object
       description: |-
@@ -14304,6 +14375,80 @@ components:
         path:
           type: string
           description: The field.
+    PlanReport:
+      type: object
+      description: |-
+        What the `agent` builder's planner reported for a run: where the Dockerfile came from, or why
+        it stopped, and what the model used.
+      properties:
+        buildVariables:
+          type: array
+          items:
+            type: string
+          description: Variables the build reads.
+          default: []
+        detail:
+          type:
+          - string
+          - "null"
+          description: What the person must do, when it stopped.
+          default: null
+        dockerfile:
+          type:
+          - string
+          - "null"
+          description: |-
+            `repository` (the repository's own), `previous` (the Dockerfile an earlier run saved) or
+            `agent` (the model wrote it in this run); none when it stopped.
+          default: null
+        inputTokens:
+          type: integer
+          format: int64
+          description: Input tokens over every model call.
+          default: 0
+          minimum: 0
+        language:
+          type:
+          - string
+          - "null"
+          description: The language, such as `Node.js`.
+          default: null
+        modelCalled:
+          type: boolean
+          description: Whether the model was called.
+          default: false
+        outputTokens:
+          type: integer
+          format: int64
+          description: Output tokens over every model call.
+          default: 0
+          minimum: 0
+        port:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: The port the app listens on, when the model wrote the Dockerfile.
+          default: null
+          minimum: 0
+        runtimeVariables:
+          type: array
+          items:
+            type: string
+          description: Variables the app reads when it starts.
+          default: []
+        stopped:
+          type:
+          - string
+          - "null"
+          description: Why it stopped without a Dockerfile, such as `ModelKeyMissing` or `NoAppFound`.
+          default: null
+        version:
+          type:
+          - string
+          - "null"
+          description: Its version, such as `24.9`.
+          default: null
     PlanRequest:
       type: object
       description: What a person asks to change, as one plan.
@@ -15946,6 +16091,14 @@ components:
       - building
       - unreadable
       properties:
+        agent:
+          oneOf:
+          - $ref: "#/components/schemas/AgentBuilder"
+            description: |-
+              The `agent` builder, whose model writes a Dockerfile: none when the cluster does not have
+              it or the person cannot read `ClusterBuilder`s. A service can build with it only while it
+              is ready.
+          - type: "null"
         building:
           type: boolean
           description: A build is under way or about to be, so a client polls sooner.
@@ -20925,6 +21078,9 @@ components:
           description: |-
             The ports that image declares, `3000/tcp` each (`status.exposedPorts`); none when it
             declares none.
+        freshPlan:
+          type: boolean
+          description: "`builder.zeabur.com/plan: fresh` is set: every run asks the model for a new Dockerfile."
         gitRef:
           type:
           - string
@@ -21115,6 +21271,13 @@ components:
           - string
           - "null"
           description: "`Pending`, `Planning`, `Building`, `Succeeded`, `Failed` or `Cancelled`."
+        plan:
+          oneOf:
+          - $ref: "#/components/schemas/PlanReport"
+            description: >-
+              What the `agent` builder's planner reported (`status.plan`); none for another
+              builder.
+          - type: "null"
         reason:
           type:
           - string

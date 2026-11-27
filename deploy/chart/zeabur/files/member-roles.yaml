@@ -17,12 +17,18 @@
 # restore can read every backup in the repository the project's Schedule names. Give each project
 # its own backup path and password.
 
-# Everyone signed in: node names and status, the names of every project, the StorageClasses a
-# new volume can use, and the PersistentVolume behind a claim (where its data is). `get` without
-# `list`: a provisioned volume is named after its claim's uid, which only readers of the claim see.
+# Everyone signed in: node names and status, the names of every project, Zeabur Builder's
+# ClusterBuilders, the StorageClasses a new volume can use, and the PersistentVolume behind a
+# claim (where its data is). `get` without `list`: a provisioned volume is named after its
+# claim's uid, which only readers of the claim see.
 zeabur-member:
   - apiGroups: [""]
     resources: [nodes, namespaces]
+    verbs: [get, list]
+  # Zeabur Builder's ClusterBuilders: whether the `agent` builder is there, its model, and the
+  # Secret or ServiceAccount a project needs for it. They hold no secret.
+  - apiGroups: [builder.zeabur.com]
+    resources: [clusterbuilders]
     verbs: [get, list]
   - apiGroups: [storage.k8s.io]
     resources: [storageclasses]

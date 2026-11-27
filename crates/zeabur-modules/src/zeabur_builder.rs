@@ -13,7 +13,8 @@ use k8s_openapi::jiff::{SignedDuration, Timestamp};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_builder_api::build::{Build, ConditionReason, NotifyType, SourceKind};
-use zeabur_builder_api::build_run::BuildRun;
+use zeabur_builder_api::build_run::{self, BuildRun};
+use zeabur_builder_api::cluster_builder::{ClusterBuilder, Credential, Planner};
 use zeabur_builder_api::common::{Condition, ConditionStatus, ConditionType};
 use zeabur_builder_api::{GROUP, annotations, labels};
 use zeabur_kube::DynamicObject;
@@ -46,11 +47,25 @@ pub const BUILD_RUNS: Read = Read {
 };
 
 /// The label a `BuildRun` and its pod carry with the `BuildRun`'s name.
+/// `builder.zeabur.com/v1alpha1` `ClusterBuilder`, cluster-wide.
+pub const CLUSTER_BUILDERS: Read = Read {
+    group: GROUP,
+    version: "v1alpha1",
+    resource: "clusterbuilders",
+    kind: "ClusterBuilder",
+};
+
+/// The `ClusterBuilder` whose model writes a Dockerfile, which the chart installs when
+/// `agent.enabled` is set.
+pub const AGENT: &str = "agent";
+
+/// The label a `BuildRun` and its pod carry with the `BuildRun`'s name.
 pub const RUN_LABEL: &str = labels::BUILD_RUN;
 
 /// A `Build`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+#[expect(clippy::struct_excessive_bools, reason = "each is a fact of its own")]
 pub struct ZeaburBuilderBuild {
     /// Its name.
     pub name: String,
@@ -108,6 +123,9 @@ pub struct ZeaburBuilderBuild {
     pub keel_webhooks: Vec<String>,
     /// The value of the rebuild annotation, when set.
     pub rebuild_requested: Option<String>,
+    /// `builder.zeabur.com/plan: fresh` is set: every run asks the model for a new Dockerfile.
+    #[serde(default)]
+    pub fresh_plan: bool,
 }
 
 /// A build variable of a `Build`.
@@ -225,6 +243,127 @@ pub struct ZeaburBuilderRun {
     pub tags: Vec<String>,
     /// The pushed manifest's digest.
     pub digest: Option<String>,
+    /// What the `agent` builder's planner reported (`status.plan`); none for another builder.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<PlanReport>,
+}
+
+/// What the `agent` builder's planner reported for a run: where the Dockerfile came from, or why
+/// it stopped, and what the model used.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(default, rename_all = "camelCase")]
+pub struct PlanReport {
+    /// `repository` (the repository's own), `previous` (the Dockerfile an earlier run saved) or
+    /// `agent` (the model wrote it in this run); none when it stopped.
+    pub dockerfile: Option<String>,
+    /// Why it stopped without a Dockerfile, such as `ModelKeyMissing` or `NoAppFound`.
+    pub stopped: Option<String>,
+    /// What the person must do, when it stopped.
+    pub detail: Option<String>,
+    /// Whether the model was called.
+    pub model_called: bool,
+    /// Input tokens over every model call.
+    pub input_tokens: u64,
+    /// Output tokens over every model call.
+    pub output_tokens: u64,
+    /// The port the app listens on, when the model wrote the Dockerfile.
+    pub port: Option<u16>,
+    /// The language, such as `Node.js`.
+    pub language: Option<String>,
+    /// Its version, such as `24.9`.
+    pub version: Option<String>,
+    /// Variables the build reads.
+    pub build_variables: Vec<String>,
+    /// Variables the app reads when it starts.
+    pub runtime_variables: Vec<String>,
+}
+
+/// The `agent` `ClusterBuilder`: whether it builds, and how its runs sign in to the model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentBuilder {
+    /// Its `Ready` condition is `True`.
+    pub ready: bool,
+    /// The model provider, such as `anthropic`.
+    pub provider: Option<String>,
+    /// The model, such as `claude-opus-5-5`.
+    pub model: Option<String>,
+    /// What each project whose services build with it needs, to sign in to the model.
+    pub credential: Option<AgentCredential>,
+}
+
+/// What a project needs for the `agent` builder's runs to sign in to the model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum AgentCredential {
+    /// A Secret with the API key.
+    #[serde(rename_all = "camelCase")]
+    Secret {
+        /// The Secret.
+        name: String,
+        /// Its key.
+        key: String,
+    },
+    /// A ServiceAccount whose token the provider exchanges for an access token.
+    #[serde(rename_all = "camelCase")]
+    ServiceAccount {
+        /// The ServiceAccount.
+        name: String,
+    },
+}
+
+/// The `agent` `ClusterBuilder` among `objects`; none when the chart did not install it, or when
+/// it is not an `agent` `ClusterBuilder` of the Zeabur Builder release Zeabur is built against.
+#[must_use]
+pub fn agent_builder(objects: &[DynamicObject]) -> Option<AgentBuilder> {
+    let builder = objects
+        .iter()
+        .find(|o| o.metadata.name.as_deref() == Some(AGENT))?
+        .clone()
+        .try_parse::<ClusterBuilder>()
+        .ok()?;
+    let Planner::Agent { agent } = &builder.spec.planner else {
+        return None;
+    };
+    let model = &agent.model;
+    let credential = match model.auth.credential() {
+        Credential::Secret(key) => AgentCredential::Secret {
+            name: key.name.clone(),
+            key: key.key.clone(),
+        },
+        Credential::ServiceAccount(name) => AgentCredential::ServiceAccount {
+            name: name.to_owned(),
+        },
+    };
+    Some(AgentBuilder {
+        ready: builder.status.as_ref().is_some_and(|status| {
+            status
+                .conditions
+                .iter()
+                .any(|c| c.kind == ConditionType::Ready && c.status == ConditionStatus::True)
+        }),
+        provider: filled(Some(&model.provider)),
+        model: filled(Some(&model.model)),
+        credential: Some(credential),
+    })
+}
+
+impl From<build_run::PlanReport> for PlanReport {
+    fn from(report: build_run::PlanReport) -> Self {
+        Self {
+            dockerfile: report.dockerfile.and_then(written),
+            stopped: report.stopped.and_then(written),
+            detail: report.detail.filter(|d| !d.is_empty()),
+            model_called: report.model_called,
+            input_tokens: u64::try_from(report.input_tokens).unwrap_or_default(),
+            output_tokens: u64::try_from(report.output_tokens).unwrap_or_default(),
+            port: report.port.and_then(|p| u16::try_from(p).ok()),
+            language: filled(Some(&report.language)),
+            version: filled(Some(&report.version)),
+            build_variables: report.build_variables,
+            runtime_variables: report.runtime_variables,
+        }
+    }
 }
 
 /// The repository of an image reference: without its digest and tag.
@@ -335,6 +474,12 @@ fn read_build(build: &Build, now: Option<Timestamp>) -> ZeaburBuilderBuild {
             .annotations
             .as_ref()
             .and_then(|a| a.get(annotations::REBUILD).cloned()),
+        fresh_plan: build
+            .metadata
+            .annotations
+            .as_ref()
+            .and_then(|a| a.get(annotations::PLAN))
+            .is_some_and(|v| v == annotations::PLAN_FRESH),
     }
 }
 
@@ -366,6 +511,7 @@ pub fn runs(objects: &[DynamicObject]) -> Vec<ZeaburBuilderRun> {
                 finished_at: status.completion_time,
                 tags: status.tags,
                 digest: filled(status.image_digest.as_ref()),
+                plan: status.plan.map(PlanReport::from),
             })
         })
         .collect();
@@ -663,5 +809,72 @@ mod tests {
         assert_eq!(problem.condition, "BuilderReady");
         assert!(problem.lasting);
         assert_eq!(found[0].git_ref.as_deref(), Some("HEAD"));
+    }
+    fn cluster_builder(name: &str, auth: &serde_json::Value, ready: &str) -> DynamicObject {
+        object(serde_json::json!({
+            "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "ClusterBuilder",
+            "metadata": {"name": name},
+            "spec": {"type": "agent", "agent": {"image": "planner:1", "model": {
+                "provider": "anthropic", "model": "claude-opus-5-5", "auth": auth}},
+                "frontend": {"type": "dockerfile.v0"}},
+            "status": {"conditions": [{"type": "Ready", "status": ready, "reason": "Checked",
+                "lastTransitionTime": "2026-10-23T08:00:00Z"}]},
+        }))
+    }
+
+    #[test]
+    fn the_agent_builder_and_what_a_project_needs_to_sign_in() {
+        let key =
+            serde_json::json!({"type": "apiKey", "apiKey": {"name": "model", "key": "anthropic"}});
+        let found = agent_builder(&[
+            cluster_builder("railpack", &serde_json::json!({}), "True"),
+            cluster_builder("agent", &key, "True"),
+        ])
+        .unwrap();
+        assert_eq!(
+            found,
+            AgentBuilder {
+                ready: true,
+                provider: Some("anthropic".to_owned()),
+                model: Some("claude-opus-5-5".to_owned()),
+                credential: Some(AgentCredential::Secret {
+                    name: "model".to_owned(),
+                    key: "anthropic".to_owned(),
+                }),
+            }
+        );
+        let federation = serde_json::json!({"type": "anthropicFederation",
+            "anthropicFederation": {"serviceAccountName": "builder-agent", "federationRuleId": "r",
+                "organizationId": "o"}});
+        let found = agent_builder(&[cluster_builder("agent", &federation, "False")]).unwrap();
+        assert!(!found.ready);
+        assert_eq!(
+            found.credential,
+            Some(AgentCredential::ServiceAccount {
+                name: "builder-agent".to_owned()
+            })
+        );
+        assert_eq!(
+            agent_builder(&[cluster_builder("railpack", &serde_json::json!({}), "True")]),
+            None
+        );
+    }
+
+    #[test]
+    fn a_run_carries_the_plan_report() {
+        let run = object(serde_json::json!({
+            "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "BuildRun",
+            "metadata": {"name": "web-1"},
+            "spec": {"buildRef": "web", "revision": "1ce75d01b6978863647da42557a707a479da3a51"},
+            "status": {"phase": "Succeeded", "planSource": "generated", "plan": {
+                "dockerfile": "agent", "modelCalled": true, "inputTokens": 10616,
+                "outputTokens": 704, "port": 5006, "language": "Node.js", "version": "24.9",
+                "runtimeVariables": ["PORT"]}},
+        }));
+        let plan = runs(&[run])[0].plan.clone().unwrap();
+        assert_eq!(plan.dockerfile.as_deref(), Some("agent"));
+        assert_eq!((plan.input_tokens, plan.output_tokens), (10616, 704));
+        assert_eq!(plan.port, Some(5006));
+        assert_eq!(plan.runtime_variables, ["PORT"]);
     }
 }

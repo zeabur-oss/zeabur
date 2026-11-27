@@ -202,6 +202,42 @@ export type AffectedService = {
 }
 
 /**
+ * What a project needs for the `agent` builder's runs to sign in to the model.
+ */
+export type AgentCredential =
+  | {
+      /** Its key. */
+      key: string
+      /** The Secret. */
+      name: string
+      type: "secret"
+    }
+  | {
+      /** The ServiceAccount. */
+      name: string
+      type: "serviceAccount"
+    }
+
+/**
+ * The `agent` `ClusterBuilder`: whether it builds, and how its runs sign in to the model.
+ */
+export type AgentBuilder = {
+  credential?: AgentCredential | null
+  /**
+   * The model, such as `claude-opus-5-5`.
+   * @nullable
+   */
+  model?: string | null
+  /**
+   * The model provider, such as `anthropic`.
+   * @nullable
+   */
+  provider?: string | null
+  /** Its `Ready` condition is `True`. */
+  ready: boolean
+}
+
+/**
  * Its settings that are not secret, by the request's field names (`chatId`, `to`, `from`,
  * `smarthost`, `username`); empty for one Zeabur did not make.
  */
@@ -1077,6 +1113,7 @@ export type BuildMethod = (typeof BuildMethod)[keyof typeof BuildMethod]
 export const BuildMethod = {
   railpack: "railpack",
   dockerfile: "dockerfile",
+  agent: "agent",
 } as const
 
 /**
@@ -1237,6 +1274,14 @@ export type BuildOptionsChange = {
    * `secretName` and `key`.
    */
   env?: EnvEdit[]
+  /**
+   * For [`BuildMethod::Agent`]: `true` has every run ask the model for a new Dockerfile
+   * instead of building the one it saved (the `builder.zeabur.com/plan: fresh` annotation),
+   * `false` goes back to the saved one.
+   * @nullable
+   */
+  freshPlan?: boolean | null
+  method?: BuildMethod | null
 }
 
 /**
@@ -8845,6 +8890,61 @@ export type Plan = {
 }
 
 /**
+ * What the `agent` builder's planner reported for a run: where the Dockerfile came from, or why
+ * it stopped, and what the model used.
+ */
+export type PlanReport = {
+  /** Variables the build reads. */
+  buildVariables?: string[]
+  /**
+   * What the person must do, when it stopped.
+   * @nullable
+   */
+  detail?: string | null
+  /**
+   * `repository` (the repository's own), `previous` (the Dockerfile an earlier run saved) or
+   * `agent` (the model wrote it in this run); none when it stopped.
+   * @nullable
+   */
+  dockerfile?: string | null
+  /**
+   * Input tokens over every model call.
+   * @minimum 0
+   */
+  inputTokens?: number
+  /**
+   * The language, such as `Node.js`.
+   * @nullable
+   */
+  language?: string | null
+  /** Whether the model was called. */
+  modelCalled?: boolean
+  /**
+   * Output tokens over every model call.
+   * @minimum 0
+   */
+  outputTokens?: number
+  /**
+   * The port the app listens on, when the model wrote the Dockerfile.
+   * @minimum 0
+   * @nullable
+   */
+  port?: number | null
+  /** Variables the app reads when it starts. */
+  runtimeVariables?: string[]
+  /**
+   * Why it stopped without a Dockerfile, such as `ModelKeyMissing` or `NoAppFound`.
+   * @nullable
+   */
+  stopped?: string | null
+  /**
+   * Its version, such as `24.9`.
+   * @nullable
+   */
+  version?: string | null
+}
+
+/**
  * What a person asks to change, as one plan.
  */
 export type PlanRequest = {
@@ -9528,6 +9628,8 @@ export type ZeaburBuilderBuild = {
    * @nullable
    */
   exposedPorts?: string[] | null
+  /** `builder.zeabur.com/plan: fresh` is set: every run asks the model for a new Dockerfile. */
+  freshPlan?: boolean
   /**
    * The branch or tag it follows; `HEAD` (or none) follows the repository's default branch.
    * @nullable
@@ -9679,6 +9781,7 @@ export type ZeaburBuilderRun = {
    * @nullable
    */
   phase?: string | null
+  plan?: PlanReport | null
   /**
    * Why it waits or failed.
    * @nullable
@@ -9722,6 +9825,7 @@ export type ProjectBuildRun = ZeaburBuilderRun & {
  * A project's builds.
  */
 export type ProjectBuilds = {
+  agent?: AgentBuilder | null
   /** A build is under way or about to be, so a client polls sooner. */
   building: boolean
   /** The `Build`s, by name. */

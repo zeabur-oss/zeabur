@@ -16,7 +16,7 @@ use zeabur_kube::{Cluster, ClusterError, ClusterExt as _, ResourceRef};
 use zeabur_model::Health;
 use zeabur_modules::Reading;
 use zeabur_modules::zeabur_builder::{
-    self, BUILD_RUNS, BUILDS, RUN_LABEL, ZeaburBuilderBuild, ZeaburBuilderRun,
+    self, BUILD_RUNS, BUILDS, CLUSTER_BUILDERS, RUN_LABEL, ZeaburBuilderBuild, ZeaburBuilderRun,
 };
 
 use crate::error::ApiError;
@@ -168,6 +168,11 @@ pub struct ProjectBuilds {
     pub runs: Vec<ProjectBuildRun>,
     /// A build is under way or about to be, so a client polls sooner.
     pub building: bool,
+    /// The `agent` builder, whose model writes a Dockerfile: none when the cluster does not have
+    /// it or the person cannot read `ClusterBuilder`s. A service can build with it only while it
+    /// is ready.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<zeabur_builder::AgentBuilder>,
     /// What could not be read.
     pub unreadable: Vec<UnreadableView>,
 }
@@ -238,6 +243,7 @@ async fn read(
         builds: Vec::new(),
         runs: Vec::new(),
         building: false,
+        agent: None,
         unreadable: Vec::new(),
     };
     let builds = match crate::cluster::modules::read_in(cluster, &BUILDS, Some(project)).await? {
@@ -302,8 +308,15 @@ async fn read(
         .into_iter()
         .map(|build| judged(build, &runs))
         .collect();
+    // Every member may read `ClusterBuilder`s (`zeabur-member`); a person who cannot is not
+    // offered the agent, and the form says nothing more.
+    let agent = match crate::cluster::modules::read_in(cluster, &CLUSTER_BUILDERS, None).await? {
+        Reading::Objects(objects) => zeabur_builder::agent_builder(&objects),
+        Reading::NotInstalled | Reading::Refused(_) => None,
+    };
     Ok(ProjectBuilds {
         state: ProviderState::Installed,
+        agent,
         component: component(),
         building: building(&builds, &runs, now),
         builds,

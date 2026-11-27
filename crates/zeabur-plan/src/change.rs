@@ -696,6 +696,14 @@ pub struct BuildOptionsChange {
     /// `secretName` and `key`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub env: Vec<EnvEdit>,
+    /// How it builds, `spec.builderRef`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub method: Option<BuildMethod>,
+    /// For [`BuildMethod::Agent`]: `true` has every run ask the model for a new Dockerfile
+    /// instead of building the one it saved (the `builder.zeabur.com/plan: fresh` annotation),
+    /// `false` goes back to the saved one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fresh_plan: Option<bool>,
 }
 
 /// How Zeabur Builder builds a folder.
@@ -707,6 +715,21 @@ pub enum BuildMethod {
     Railpack,
     /// The folder's Dockerfile.
     Dockerfile,
+    /// A model writes a Dockerfile, and later runs build the one it saved (the `agent`
+    /// `ClusterBuilder`).
+    Agent,
+}
+
+impl BuildMethod {
+    /// The `ClusterBuilder` a `Build` names in `spec.builderRef`.
+    #[must_use]
+    pub const fn builder_ref(self) -> &'static str {
+        match self {
+            Self::Railpack => "railpack",
+            Self::Dockerfile => "dockerfile",
+            Self::Agent => "agent",
+        }
+    }
 }
 
 /// How much a new service asks for.
