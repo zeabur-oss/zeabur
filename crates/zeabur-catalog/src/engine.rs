@@ -676,7 +676,7 @@ fn generated(
 }
 
 /// `bytes` random bytes in `encoding`.
-fn random(bytes: u8, encoding: Encoding) -> Result<String, String> {
+pub(crate) fn random(bytes: u8, encoding: Encoding) -> Result<String, String> {
     let mut buffer = vec![0; usize::from(bytes)];
     aws_lc_rs::rand::fill(&mut buffer).map_err(|_unspecified| "no random bytes".to_owned())?;
     Ok(match encoding {

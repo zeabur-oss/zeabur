@@ -398,8 +398,58 @@ impl Catalog {
     /// When the catalogue does not have the template, when `options` fail the catalogue's
     /// checks, or when the template does not read.
     pub fn render(&self, id: &str, options: &RenderOptions<'_>) -> Result<Vec<Value>, RenderError> {
+        render_source(id, self.find(id)?, options)
+    }
+
+    /// What deploying `id` writes, as the web interface sends it: a Secret with fresh random
+    /// values for each name the generated inputs share, then the objects [`Catalog::render`]
+    /// makes, each with `metadata.namespace`.
+    ///
+    /// A required input that is not given is the placeholder `<name>`; so are
+    /// a missing domain (`<domain>`) and issuer (`<clusterIssuer>`) the template needs. Each call
+    /// generates new values.
+    ///
+    /// # Errors
+    ///
+    /// As [`Catalog::render`], except for what a placeholder stands in for, and when the system
+    /// random number generator fails.
+    pub fn export(&self, id: &str, options: &RenderOptions<'_>) -> Result<Vec<Value>, RenderError> {
         let source = self.find(id)?;
-        render_file(id, source, options)
+        let template = source.read(id)?;
+        check(&template, options, Missing::Placeholder)?;
+        let placeholder = |name: &str| format!("<{name}>");
+        let mut inputs = options.inputs.clone();
+        for input in &template.inputs {
+            if input.generate.is_none() && input.required {
+                inputs
+                    .entry(input.name.clone())
+                    .or_insert_with(|| placeholder(&input.name));
+            }
+        }
+        let domain = options
+            .domain
+            .filter(|d| !d.is_empty())
+            .map(str::to_owned)
+            .or_else(|| template.needs_domain.then(|| placeholder("domain")));
+        let cluster_issuer = options
+            .cluster_issuer
+            .filter(|i| !i.is_empty())
+            .map(str::to_owned)
+            .or_else(|| template.needs_cluster_issuer.then(|| placeholder("clusterIssuer")));
+        let filled = RenderOptions {
+            namespace: options.namespace,
+            domain: domain.as_deref(),
+            cluster_issuer: cluster_issuer.as_deref(),
+            inputs: &inputs,
+        };
+        let mut objects = generated_secrets(&template)?;
+        objects.extend(render_file(&template, source, &filled)?);
+        for object in &mut objects {
+            if let Some(metadata) = object.get_mut("metadata").and_then(Value::as_object_mut) {
+                metadata.insert("namespace".to_owned(), json!(options.namespace));
+            }
+        }
+        Ok(objects)
     }
 
     fn find(&self, id: &str) -> Result<&Source, RenderError> {
@@ -633,17 +683,65 @@ fn read(
     })
 }
 
-fn render_file(
+/// One Secret for each name the generated inputs share, with a new value for each, as the web
+/// interface creates them in the plan that deploys the template.
+fn generated_secrets(template: &Template) -> Result<Vec<Value>, RenderError> {
+    let mut secrets: BTreeMap<&str, serde_json::Map<String, Value>> = BTreeMap::new();
+    for input in &template.inputs {
+        let (Some(generate), Some(secret)) = (input.generate, &input.secret) else {
+            continue;
+        };
+        let encoding = match generate.encoding {
+            Encoding::Base64url => format::Encoding::Base64url,
+            Encoding::Hex => format::Encoding::Hex,
+        };
+        let value = crate::engine::random(generate.bytes, encoding).map_err(|detail| {
+            RenderError::Broken {
+                template: template.id.clone(),
+                detail,
+            }
+        })?;
+        secrets
+            .entry(secret.name.as_str())
+            .or_default()
+            .insert(secret.key.clone(), json!(value));
+    }
+    Ok(secrets
+        .into_iter()
+        .map(|(name, data)| {
+            json!({
+                "apiVersion": "v1",
+                "kind": "Secret",
+                "metadata": {"name": name, "labels": template.labels},
+                "type": "Opaque",
+                "stringData": data,
+            })
+        })
+        .collect())
+}
+
+/// The objects of the template `id` read from `source`, for `options`.
+fn render_source(
     id: &str,
     source: &Source,
     options: &RenderOptions<'_>,
 ) -> Result<Vec<Value>, RenderError> {
     let template = source.read(id)?;
+    check(&template, options, Missing::Refuse)?;
+    render_file(&template, source, options)
+}
+
+/// `template`'s objects for `options`, which [`check`] has passed.
+fn render_file(
+    template: &Template,
+    source: &Source,
+    options: &RenderOptions<'_>,
+) -> Result<Vec<Value>, RenderError> {
+    let id = template.id.as_str();
     let broken = |detail: String| RenderError::Broken {
         template: id.to_owned(),
         detail,
     };
-    check(&template, options)?;
     let mut inputs: BTreeMap<&str, &str> = options
         .inputs
         .iter()
@@ -685,7 +783,21 @@ fn render_file(
     Ok(objects)
 }
 
-fn check(template: &Template, options: &RenderOptions<'_>) -> Result<(), RenderError> {
+/// What [`check`] does with a missing domain, issuer or required input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Missing {
+    /// Refuse it.
+    Refuse,
+    /// Let it through: [`Catalog::export`] writes a placeholder for it.
+    Placeholder,
+}
+
+fn check(
+    template: &Template,
+    options: &RenderOptions<'_>,
+    missing: Missing,
+) -> Result<(), RenderError> {
+    let refuse = missing == Missing::Refuse;
     if !is_dns_label(options.namespace) {
         return Err(RenderError::Namespace(options.namespace.to_owned()));
     }
@@ -693,14 +805,14 @@ fn check(template: &Template, options: &RenderOptions<'_>) -> Result<(), RenderE
         Some(domain) if !is_hostname(domain) || domain.parse::<IpAddr>().is_ok() => {
             return Err(RenderError::Domain(domain.to_owned()));
         }
-        None if template.needs_domain => return Err(RenderError::NoDomain),
+        None if refuse && template.needs_domain => return Err(RenderError::NoDomain),
         Some(_) | None => {}
     }
     match options.cluster_issuer.filter(|i| !i.is_empty()) {
         Some(issuer) if !is_hostname(issuer) => {
             return Err(RenderError::ClusterIssuer(issuer.to_owned()));
         }
-        None if template.needs_cluster_issuer => return Err(RenderError::NoClusterIssuer),
+        None if refuse && template.needs_cluster_issuer => return Err(RenderError::NoClusterIssuer),
         Some(_) | None => {}
     }
     for input in &template.inputs {
@@ -712,7 +824,7 @@ fn check(template: &Template, options: &RenderOptions<'_>) -> Result<(), RenderE
             continue;
         }
         match value {
-            None if input.required => return Err(RenderError::Missing(input.name.clone())),
+            None if refuse && input.required => return Err(RenderError::Missing(input.name.clone())),
             None => {}
             Some(value) => {
                 let pattern = Regex::new(&format!(r"\A(?:{})\z", input.pattern)).map_err(|e| {
@@ -1188,7 +1300,7 @@ mod tests {
                 manifests: Cow::Owned(manifests.to_owned()),
                 revision: String::new(),
             };
-            let got = render_file(
+            let got = render_source(
                 id,
                 &source,
                 &RenderOptions {
@@ -1289,8 +1401,8 @@ mod tests {
             inputs: &inputs,
         };
         assert_eq!(
-            render_file("miniflux", &fetched, &options).unwrap(),
-            render_file("miniflux", &written, &options).unwrap()
+            render_source("miniflux", &fetched, &options).unwrap(),
+            render_source("miniflux", &written, &options).unwrap()
         );
     }
 
@@ -1416,5 +1528,77 @@ mod tests {
             "{dropped:?}"
         );
         assert_eq!(catalog.template("ollama"), embedded.template("ollama"));
+    }
+
+    fn export(id: &str, inputs: &[(&str, &str)]) -> Result<Vec<Value>, RenderError> {
+        let inputs = inputs
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        Catalog::embedded().export(
+            id,
+            &RenderOptions {
+                namespace: "shop",
+                domain: None,
+                cluster_issuer: None,
+                inputs: &inputs,
+            },
+        )
+    }
+
+    #[test]
+    fn an_export_writes_placeholders_for_what_is_missing() {
+        let objects = export("wordpress", &[]).unwrap();
+        let text = serde_saphyr::to_string(&objects).unwrap();
+        for placeholder in ["<adminEmail>", "<domain>", "<clusterIssuer>"] {
+            assert!(text.contains(placeholder), "{placeholder} in {text}");
+        }
+        assert!(
+            objects
+                .iter()
+                .all(|o| o.pointer("/metadata/namespace") == Some(&json!("shop")))
+        );
+        let given = export("wordpress", &[("adminEmail", "me@example.com")]).unwrap();
+        let text = serde_saphyr::to_string(&given).unwrap();
+        assert!(!text.contains("<adminEmail>"), "{text}");
+        assert!(text.contains("me@example.com"), "{text}");
+    }
+
+    #[test]
+    fn an_export_generates_the_secrets_of_generated_inputs() {
+        let secrets = |objects: &[Value]| -> Vec<Value> {
+            objects
+                .iter()
+                .filter(|o| o["kind"] == "Secret" && o["stringData"].is_object())
+                .cloned()
+                .collect()
+        };
+        let first = export("miniflux", &[]).unwrap();
+        let [secret] = secrets(&first).try_into().unwrap();
+        assert_eq!(secret["metadata"]["name"], "miniflux-secrets");
+        assert_eq!(
+            secret["metadata"]["labels"]["templates.zeabur.com/template"],
+            "miniflux"
+        );
+        let password = secret["stringData"]["admin-password"].as_str().unwrap();
+        assert_eq!(password.len(), 43, "32 bytes in unpadded base64url");
+        let again = export("miniflux", &[]).unwrap();
+        assert_ne!(secrets(&again), secrets(&first), "each export makes new values");
+    }
+
+    #[test]
+    fn an_export_refuses_what_a_deploy_refuses() {
+        assert_eq!(
+            export("nope", &[]),
+            Err(RenderError::UnknownTemplate("nope".to_owned()))
+        );
+        assert_eq!(
+            export("wordpress", &[("adminEmail", "nope")]),
+            Err(RenderError::Pattern("adminEmail".to_owned()))
+        );
+        assert_eq!(
+            export("miniflux", &[("adminPassword", "x")]),
+            Err(RenderError::Generated("adminPassword".to_owned()))
+        );
     }
 }
