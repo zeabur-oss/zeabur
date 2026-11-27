@@ -1,6 +1,6 @@
 //! Service ports and their application protocols; Ingress rules.
 
-use k8s_openapi::api::core::v1::{Node, Service as KubeService, ServicePort};
+use k8s_openapi::api::core::v1::{Node, Pod, Service as KubeService, ServicePort};
 use k8s_openapi::api::networking::v1::{Ingress, IngressServiceBackend};
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use zeabur_model::{
@@ -8,7 +8,7 @@ use zeabur_model::{
     ProtocolInference, RouteRule,
 };
 
-use crate::snapshot::name_of;
+use crate::snapshot::{Snapshot, name_of};
 
 /// The application protocol of a Service port.
 ///
@@ -157,21 +157,72 @@ fn node_address(node: &Node) -> Option<&str> {
     of("ExternalIP").or_else(|| of("InternalIP"))
 }
 
-/// Adds `<node address>:<node port>` to every port with a node port, one per node, in the
-/// nodes' order. kube-proxy opens a node port on every node [k8s-nodeport].
+/// Adds `<node address>:<node port>` to every port with a node port, one per node.
+///
+/// The nodes keep their order. kube-proxy opens a node port on every node [k8s-nodeport]. With
+/// `externalTrafficPolicy: Local` a node drops the traffic unless a ready endpoint of the Service
+/// runs on it [k8s-local], so only the nodes of the Service's ready pods are listed.
 ///
 /// [k8s-nodeport]: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
-pub fn with_node_addresses(endpoints: &mut [Endpoint], nodes: &[Node]) {
-    let hosts: Vec<&str> = nodes.iter().filter_map(node_address).collect();
-    for port in endpoints.iter_mut().flat_map(|e| e.ports.iter_mut()) {
-        let Some(node_port) = port.node_port else {
-            continue;
+/// [k8s-local]: https://kubernetes.io/docs/reference/networking/virtual-ips/#external-traffic-policy
+pub fn with_node_addresses(endpoints: &mut [Endpoint], nodes: &[Node], snapshot: &Snapshot) {
+    for endpoint in endpoints.iter_mut() {
+        let local = snapshot
+            .services
+            .iter()
+            .find(|s| name_of(&s.metadata) == endpoint.name)
+            .and_then(|s| s.spec.as_ref())
+            .filter(|spec| spec.external_traffic_policy.as_deref() == Some("Local"));
+        let eligible = |node: &&Node| {
+            local.is_none_or(|spec| {
+                let name = name_of(&node.metadata);
+                snapshot
+                    .pods
+                    .iter()
+                    .filter(|pod| ready(pod))
+                    .filter(|pod| {
+                        pod.spec.as_ref().and_then(|s| s.node_name.as_deref()) == Some(name)
+                    })
+                    .any(|pod| selected(spec.selector.as_ref(), pod))
+            })
         };
-        port.addresses.extend(hosts.iter().map(|host| PortAddress {
-            kind: PortAddressKind::Node,
-            address: host_port(host, node_port),
-        }));
+        let hosts: Vec<&str> = nodes
+            .iter()
+            .filter(eligible)
+            .filter_map(node_address)
+            .collect();
+        for port in &mut endpoint.ports {
+            let Some(node_port) = port.node_port else {
+                continue;
+            };
+            port.addresses.extend(hosts.iter().map(|host| PortAddress {
+                kind: PortAddressKind::Node,
+                address: host_port(host, node_port),
+            }));
+        }
     }
+}
+
+/// Whether a pod is a ready endpoint: its `Ready` condition is `True` and it is not being
+/// deleted.
+fn ready(pod: &Pod) -> bool {
+    pod.metadata.deletion_timestamp.is_none()
+        && pod
+            .status
+            .iter()
+            .flat_map(|s| s.conditions.iter().flatten())
+            .any(|c| c.type_ == "Ready" && c.status == "True")
+}
+
+/// Whether a Service's selector selects a pod. A Service without a selector selects no pod.
+fn selected(selector: Option<&std::collections::BTreeMap<String, String>>, pod: &Pod) -> bool {
+    let Some(selector) = selector.filter(|s| !s.is_empty()) else {
+        return false;
+    };
+    let labels = pod.metadata.labels.as_ref();
+    selector
+        .iter()
+        .all(|(key, value)| labels.and_then(|l| l.get(key)) == Some(value))
 }
 
 /// The Service backends of an Ingress: the default backend first, then each rule's paths in order.
@@ -241,13 +292,13 @@ mod tests {
         serde_json::from_value(value).expect("a Service")
     }
 
-    fn node(addresses: &[(&str, &str)]) -> Node {
+    fn node(name: &str, addresses: &[(&str, &str)]) -> Node {
         let addresses: Vec<_> = addresses
             .iter()
             .map(|(kind, address)| json!({"type": kind, "address": address}))
             .collect();
         serde_json::from_value(
-            json!({"metadata": {"name": "n"}, "status": {"addresses": addresses}}),
+            json!({"metadata": {"name": name}, "status": {"addresses": addresses}}),
         )
         .expect("a Node")
     }
@@ -302,12 +353,15 @@ mod tests {
             "spec": {"type": "NodePort", "ports": [{"port": 80, "nodePort": 30080}]},
         }));
         let nodes = [
-            node(&[("InternalIP", "10.0.0.5"), ("ExternalIP", "198.51.100.5")]),
-            node(&[("Hostname", "n2"), ("InternalIP", "10.0.0.6")]),
-            node(&[("Hostname", "n3")]),
+            node(
+                "n1",
+                &[("InternalIP", "10.0.0.5"), ("ExternalIP", "198.51.100.5")],
+            ),
+            node("n2", &[("Hostname", "n2"), ("InternalIP", "10.0.0.6")]),
+            node("n3", &[("Hostname", "n3")]),
         ];
         let mut endpoints = [endpoint(&legacy)];
-        with_node_addresses(&mut endpoints, &nodes);
+        with_node_addresses(&mut endpoints, &nodes, &Snapshot::default());
         assert_eq!(
             kinds(&endpoints[0].ports[0])[2..],
             [
@@ -324,12 +378,56 @@ mod tests {
             "spec": {"type": "ClusterIP", "ports": [{"port": 8080}]},
         }));
         let mut endpoints = [endpoint(&api)];
-        with_node_addresses(&mut endpoints, &[node(&[("InternalIP", "10.0.0.5")])]);
+        with_node_addresses(
+            &mut endpoints,
+            &[node("n1", &[("InternalIP", "10.0.0.5")])],
+            &Snapshot::default(),
+        );
         assert!(
             endpoints[0].ports[0]
                 .addresses
                 .iter()
                 .all(|a| a.kind != PortAddressKind::Node)
         );
+    }
+
+    fn pod(node: &str, ready: bool) -> Pod {
+        let status = if ready { "True" } else { "False" };
+        serde_json::from_value(json!({
+            "metadata": {"name": format!("api-{node}"), "labels": {"app": "api"}},
+            "spec": {"nodeName": node, "containers": []},
+            "status": {"conditions": [{"type": "Ready", "status": status}]},
+        }))
+        .expect("a Pod")
+    }
+
+    #[test]
+    fn with_a_local_traffic_policy_only_the_nodes_of_ready_pods_are_listed() {
+        let api = service(json!({
+            "metadata": {"name": "api-public-8080", "namespace": "shop"},
+            "spec": {
+                "type": "LoadBalancer",
+                "externalTrafficPolicy": "Local",
+                "selector": {"app": "api"},
+                "ports": [{"port": 8080, "nodePort": 30080}],
+            },
+        }));
+        let snapshot = Snapshot {
+            services: vec![api.clone()],
+            pods: vec![pod("n1", true), pod("n2", false)],
+            ..Snapshot::default()
+        };
+        let nodes = [
+            node("n1", &[("InternalIP", "10.0.0.5")]),
+            node("n2", &[("InternalIP", "10.0.0.6")]),
+            node("n3", &[("InternalIP", "10.0.0.7")]),
+        ];
+        let mut endpoints = [endpoint(&api)];
+        with_node_addresses(&mut endpoints, &nodes, &snapshot);
+        let node_addresses: Vec<_> = kinds(&endpoints[0].ports[0])
+            .into_iter()
+            .filter(|(kind, _)| *kind == PortAddressKind::Node)
+            .collect();
+        assert_eq!(node_addresses, [(PortAddressKind::Node, "10.0.0.5:30080")]);
     }
 }

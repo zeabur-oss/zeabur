@@ -25,7 +25,7 @@ These addresses only work inside the cluster. They aren't reachable from the int
 
 A `NodePort` or `LoadBalancer` Service also opens its ports outside the cluster, and its card is marked **Open to the internet**, or **Database open to the internet** for a database. These cards come first. This includes Services that you or another tool created with YAML.
 
-- **On the nodes** shows each node's address with the node port, such as `198.51.100.5:31379`. The address is the node's external IP, or its internal IP if it has none. If Zeabur OSS can't read the nodes, it names them as unreadable and shows only **Node port 31379**.
+- **On the nodes** shows each node's address with the node port, such as `198.51.100.5:31379`. The address is the node's external IP, or its internal IP if it has none. If Zeabur OSS can't read the nodes, it names them as unreadable and shows only **Node port 31379**. With `externalTrafficPolicy: Local`, only the nodes that run a ready replica are listed, since the other nodes drop the connection.
 - **Load balancer** shows each address the load balancer gives the Service, with the Service's port.
 
 Node ports are from 30000 to 32767 by default, and the cluster picks one when the Service doesn't name it. To connect through a node, its firewall must allow the port.

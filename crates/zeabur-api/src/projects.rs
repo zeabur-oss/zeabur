@@ -273,7 +273,7 @@ pub(crate) async fn read(
     let (snapshot, mut unreadable) = snapshot(objects, now);
     let mut projection = zeabur_graph::project(&snapshot);
     zeabur_graph::with_http_routes(&mut projection, &http_routes);
-    node_addresses(cluster, &mut projection, &mut unreadable).await;
+    node_addresses(cluster, &snapshot, &mut projection, &mut unreadable).await;
     // Diagnoses read the namespace's events too. Without them (refused, or the read failed) the
     // pods' status still tells most of it, so the document is served and the refusal is named.
     let events: Vec<zeabur_gaps::Event> = match events {
@@ -322,6 +322,7 @@ pub(crate) async fn read(
 /// read. A refused list is named, and the node ports stay without addresses.
 async fn node_addresses(
     cluster: &dyn Cluster,
+    snapshot: &Snapshot,
     projection: &mut zeabur_model::Project,
     unreadable: &mut Vec<UnreadableView>,
 ) {
@@ -334,7 +335,7 @@ async fn node_addresses(
         return;
     }
     match cluster.list::<Node>(None).await {
-        Ok(nodes) => zeabur_graph::with_node_addresses(&mut projection.endpoints, &nodes),
+        Ok(nodes) => zeabur_graph::with_node_addresses(&mut projection.endpoints, &nodes, snapshot),
         Err(zeabur_kube::ClusterError::Status(status)) => unreadable.push(UnreadableView {
             resource: "nodes".to_owned(),
             kubernetes: status,
