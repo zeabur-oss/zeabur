@@ -447,7 +447,7 @@ function alertVariant(warnings: Schemas.PlanWarning[]): "destructive" | "warn" {
 }
 
 /** The form's warnings, then the plan's, its gaps and what tools manage. */
-function warningsOf(
+export function warningsOf(
   t: Translate,
   plan: Schemas.PlanResponse,
   skipped: Skipped[] | undefined,
