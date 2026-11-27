@@ -1297,6 +1297,13 @@ export const en = {
   "components.packaged": (by: string, chart: string) =>
     `A built-in ${by} component. To change its settings, create a HelmChartConfig named ${chart}.`,
   "components.packagedHow": "Example",
+  "components.memoryIdle": (idle: string) => `Uses about ${idle} of memory when idle.`,
+  "components.memoryBuild": (total: string, idle: string) =>
+    `Uses about ${total} of memory with one build running, ${idle} when idle.`,
+  "components.memoryLoad": (total: string, idle: string) =>
+    `Uses about ${total} of memory under load, ${idle} when idle.`,
+  "components.memoryWork": (total: string, idle: string) =>
+    `Uses about ${total} of memory while it works, ${idle} when idle.`,
   "components.packagedAnchor": "change-settings-of-built-in-components",
   "components.values": "Values",
   "components.required": "Required",

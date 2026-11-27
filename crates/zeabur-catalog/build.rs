@@ -1,7 +1,8 @@
 //! Embeds Zeabur Catalog's `bundle.tar.gz` from `ZEABUR_CATALOG_RELEASE`, which the Nix dev shell
 //! sets to the catalog's `release` output at the commit in flake.lock. The components
 //! (`components/<id>/component.yaml`), the templates (`templates/<id>/template.yaml` and
-//! `manifests.yaml`) and the template measurements (`measurements/templates/<id>.json`) become
+//! `manifests.yaml`) and the measurements (`measurements/templates/<id>.json`,
+//! `measurements/components/<id>.json`) become
 //! sorted tables of `include_str!` entries, so the binary carries the catalogue it was built with.
 //! `crosscheck.json`, the catalogue's own render of each template, is unpacked for the tests only.
 
@@ -25,13 +26,14 @@ fn main() {
     let archive = Path::new(&release).join("bundle.tar.gz");
     println!("cargo::rerun-if-changed={}", archive.display());
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap_or_default());
-    let (components, templates, measurements) = match unpack(&archive, &out.join("bundle")) {
-        Ok(tables) => tables,
-        Err(error) => {
-            println!("cargo::error=cannot read {}: {error}", archive.display());
-            process::exit(1);
-        }
-    };
+    let (components, templates, measurements, component_measurements) =
+        match unpack(&archive, &out.join("bundle")) {
+            Ok(tables) => tables,
+            Err(error) => {
+                println!("cargo::error=cannot read {}: {error}", archive.display());
+                process::exit(1);
+            }
+        };
     let mut code = String::from("pub(crate) static FILES: &[(&str, &str)] = &[\n");
     for (id, path) in &components {
         let _ignored = writeln!(
@@ -61,6 +63,15 @@ fn main() {
         );
     }
     code.push_str("];\n");
+    code.push_str("pub(crate) static COMPONENT_MEASUREMENTS: &[(&str, &str)] = &[\n");
+    for (id, path) in &component_measurements {
+        let _ignored = writeln!(
+            code,
+            "    ({id:?}, include_str!({:?})),",
+            path.display().to_string()
+        );
+    }
+    code.push_str("];\n");
     if let Err(error) = fs::write(out.join("bundle.rs"), code) {
         println!("cargo::error=cannot write bundle.rs: {error}");
     }
@@ -71,11 +82,15 @@ type Templates = Vec<(String, PathBuf)>;
 type Measurements = Vec<(String, PathBuf)>;
 
 /// Writes the files Zeabur reads from the archive to `dir` and returns the components, the
-/// template directories and the template measurements, sorted.
-fn unpack(archive: &Path, dir: &Path) -> io::Result<(Components, Templates, Measurements)> {
+/// template directories, the template measurements and the component measurements, sorted.
+fn unpack(
+    archive: &Path,
+    dir: &Path,
+) -> io::Result<(Components, Templates, Measurements, Measurements)> {
     let _ignored = fs::remove_dir_all(dir);
     let mut tar = tar::Archive::new(flate2::read::GzDecoder::new(File::open(archive)?));
-    let (mut components, mut templates, mut measurements) = (Vec::new(), Vec::new(), Vec::new());
+    let (mut components, mut templates) = (Vec::new(), Vec::new());
+    let (mut measurements, mut component_measurements) = (Vec::new(), Vec::new());
     for entry in tar.entries()? {
         let mut entry = entry?;
         if entry.header().entry_type().is_dir() {
@@ -100,6 +115,10 @@ fn unpack(archive: &Path, dir: &Path) -> io::Result<(Components, Templates, Meas
                 Some(id) => measurements.push((id.to_owned(), dest.clone())),
                 None => continue,
             },
+            ["measurements", "components", file] => match file.strip_suffix(".json") {
+                Some(id) => component_measurements.push((id.to_owned(), dest.clone())),
+                None => continue,
+            },
             ["templates", id, "template.yaml"] => {
                 templates.push(((*id).to_owned(), dir.join("templates").join(id)));
             }
@@ -114,5 +133,6 @@ fn unpack(archive: &Path, dir: &Path) -> io::Result<(Components, Templates, Meas
     components.sort();
     templates.sort();
     measurements.sort();
-    Ok((components, templates, measurements))
+    component_measurements.sort();
+    Ok((components, templates, measurements, component_measurements))
 }

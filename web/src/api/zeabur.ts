@@ -1305,6 +1305,75 @@ export type BuiltServiceChange = {
 }
 
 /**
+ * What one pod of a workload used once idle.
+ */
+export type MeasuredPod = {
+  /**
+   * Its CPU in millicores.
+   * @minimum 0
+   */
+  cpuMillicores: number
+  /**
+   * Its working set in bytes.
+   * @minimum 0
+   */
+  memoryBytes: number
+  /** The workload or database object (`miniflux-db`). */
+  workload: string
+}
+
+/**
+ * What a template's or a component's pods used once idle, on a fresh cluster after its smoke
+ * checks.
+ */
+export type IdleUse = {
+  /**
+   * The pods' CPU in millicores.
+   * @minimum 0
+   */
+  cpuMillicores: number
+  /** Where it was measured: `<distribution>-<profile>-<architecture>-<Kubernetes version>`. */
+  environment: string
+  /** The day it was measured. */
+  measuredAt: string
+  /**
+   * The pods' working set in bytes.
+   * @minimum 0
+   */
+  memoryBytes: number
+  /** Each workload's pod. */
+  pods: MeasuredPod[]
+}
+
+/**
+ * What one unit of a component's work uses on top of its idle use, as the catalogue declares it.
+ */
+export type WorkUse = {
+  /**
+   * Its memory in bytes.
+   * @minimum 0
+   */
+  memoryBytes: number
+  /** The work's name in the catalogue (`build`). */
+  name: string
+}
+
+/**
+ * The memory a component uses: its measured idle use plus one unit of its heaviest work.
+ */
+export type ComponentMemory = {
+  /** What its pods used once idle. */
+  idle: IdleUse
+  /**
+   * The idle memory plus the work's: what the component uses while it does one unit of that
+   * work, such as one build.
+   * @minimum 0
+   */
+  totalBytes: number
+  work?: WorkUse | null
+}
+
+/**
  * What a component uses that Zeabur cannot install yet.
  */
 export type Unsupported = (typeof Unsupported)[keyof typeof Unsupported]
@@ -1348,6 +1417,7 @@ export type Component = {
   id: string
   /** Its licence (SPDX). */
   license: string
+  memory?: ComponentMemory | null
   /**
    * What it gives the cluster, in one sentence, by language tag (`en`, `zh-TW`, `zh-CN`);
    * `en` is always there.
@@ -7067,46 +7137,6 @@ export type Hop = {
   status: HopStatus
   /** Which hop. */
   step: HopStep
-}
-
-/**
- * What one pod of a workload used once idle.
- */
-export type MeasuredPod = {
-  /**
-   * Its CPU in millicores.
-   * @minimum 0
-   */
-  cpuMillicores: number
-  /**
-   * Its working set in bytes.
-   * @minimum 0
-   */
-  memoryBytes: number
-  /** The workload or database object (`miniflux-db`). */
-  workload: string
-}
-
-/**
- * What a template's pods used once idle, on a fresh cluster after its smoke checks.
- */
-export type IdleUse = {
-  /**
-   * The pods' CPU in millicores.
-   * @minimum 0
-   */
-  cpuMillicores: number
-  /** Where it was measured: `<distribution>-<profile>-<architecture>-<Kubernetes version>`. */
-  environment: string
-  /** The day it was measured. */
-  measuredAt: string
-  /**
-   * The pods' working set in bytes.
-   * @minimum 0
-   */
-  memoryBytes: number
-  /** Each workload's pod. */
-  pods: MeasuredPod[]
 }
 
 /**

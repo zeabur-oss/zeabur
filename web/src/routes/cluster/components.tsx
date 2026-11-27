@@ -39,6 +39,7 @@ import { type Locale, useI18n, useT } from "@/i18n"
 import type { Icon } from "@/lib/icon"
 import { docsUrl } from "@/lib/docs"
 import { formatAgo } from "@/lib/format"
+import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
 import { componentsRole, Forbidden } from "@/routes/cluster/forbidden"
 import { ClusterFrame } from "@/routes/cluster/frame"
@@ -379,6 +380,7 @@ function ComponentCard({
       <p className="line-clamp-3 type-body leading-normal text-muted-foreground">
         {summaryOf(component, locale)}
       </p>
+      <MemoryNote memory={component.memory} />
       <UnstartedNote installation={installation} />
       {installation?.packagedChart ? (
         <PackagedNote by={t(sourceKey[installation.source])} chart={installation.packagedChart} />
@@ -406,6 +408,23 @@ function ComponentCard({
       </div>
     </article>
   )
+}
+
+/** The memory Zeabur Catalog measured for the component, with one unit of its heaviest work. */
+function MemoryNote({ memory }: { memory: Schemas.Component["memory"] }) {
+  const t = useT()
+  const format = useQuantityFormat()
+  if (!memory) return null
+  const total = format.memory(memory.totalBytes)
+  const idle = format.memory(memory.idle.memoryBytes)
+  const text = !memory.work
+    ? t("components.memoryIdle", idle)
+    : memory.work.name === "build"
+      ? t("components.memoryBuild", total, idle)
+      : memory.work.name === "load"
+        ? t("components.memoryLoad", total, idle)
+        : t("components.memoryWork", total, idle)
+  return <p className="type-meta text-muted-foreground">{text}</p>
 }
 
 /** The steps Zeabur has not started, when there are any. */

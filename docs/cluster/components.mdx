@@ -7,6 +7,8 @@ Open **Cluster** → **Components**. **Installed** lists detected components, an
 
 ![Installed components and the catalog on the cluster components page](../images/shots/cluster-components.avif)
 
+A card shows how much memory the component uses, from Zeabur Catalog's measurement of its pods on a fresh cluster. For a component that does work, such as builds, the figure includes one unit of that work: Zeabur Builder's figure is for one build. Zeabur OSS doesn't check whether the cluster has that much free. Compare the figure with the free memory on **Cluster** → **Nodes**.
+
 ## Before you begin
 
 To detect installed components, the components page needs permission to read CRDs and IngressClasses across the cluster and workloads in every namespace.
