@@ -4,17 +4,8 @@ import type { Endpoint } from "@/model/service"
 
 const EXTERNAL = rules["PublicPortChange.external"]
 
-/** Whether clients outside the cluster can reach the Service: a `NodePort` or `LoadBalancer`
- * Service opens its ports on the nodes or a load balancer. */
-export const outside = (e: Endpoint): boolean => e.type === "NodePort" || e.type === "LoadBalancer"
-
 /** Whether the Service is one that a public port made, and so can be closed. */
 export const isOpened = (e: Endpoint): boolean => !!e.opens
-
-/** The Service type as Kubernetes names it; a `ClusterIP` Service without a cluster IP is
- * headless. */
-export const typeLabel = (e: Endpoint): string =>
-  e.clusterIP === "None" ? "Headless" : (e.type ?? "ClusterIP")
 
 /** A Service port that a public port can open. */
 export interface PortChoice {

@@ -3900,10 +3900,10 @@ export const zhCN: Messages = {
   "ports.port": "端口",
   "ports.external": "外部端口",
   "ports.externalHint": "互联网上的客户端连接这个端口。留空则使用服务的端口。",
-  "addr.title": "Kubernetes Service",
+  "addr.title": "连接地址",
   "addr.about":
-    "这个服务的 Kubernetes Service 地址。每种 Service 在集群内都有地址；NodePort Service 也在节点上开放端口；集群有负载均衡器时，LoadBalancer Service 还会获得它给的地址。",
-  "addr.outside": "对集群外开放",
+    "客户端连接这个服务的地址，按 Kubernetes Service 列出。每个 Service 在集群内都有地址；NodePort Service 还在节点上开放端口；集群支持负载均衡器时，LoadBalancer Service 还会获得负载均衡器分配的地址。",
+  "addr.internet": "对互联网开放",
   "addr.opens": (from) => `把 ${from} 开放到互联网`,
   "addr.project": "本项目",
   "addr.cluster": "同集群的其他项目",

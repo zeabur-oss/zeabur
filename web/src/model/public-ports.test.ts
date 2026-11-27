@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { externalOf, openPortChange, outside, portChoices, typeLabel } from "@/model/public-ports"
+import { externalOf, openPortChange, portChoices } from "@/model/public-ports"
 import type { Endpoint } from "@/model/service"
 
 const workload = { kind: "Deployment", name: "web" } as const
@@ -42,17 +42,4 @@ test("a port that a public port opens is not offered again, whatever its externa
     opens: { service: "web", port: 8080 },
   } as Endpoint
   expect(portChoices([web], [opened]).map((c) => c.port)).toEqual([9090])
-})
-
-describe("a Service by its Kubernetes type", () => {
-  test.each([
-    [{}, "ClusterIP", false],
-    [{ type: "ClusterIP", clusterIP: "None" }, "Headless", false],
-    [{ type: "NodePort" }, "NodePort", true],
-    [{ type: "LoadBalancer" }, "LoadBalancer", true],
-  ])("%p is %p, reachable from outside the cluster: %p", (fields, label, out) => {
-    const e = { name: "web", ports: [], ...fields } as Endpoint
-    expect(typeLabel(e)).toBe(label)
-    expect(outside(e)).toBe(out)
-  })
 })

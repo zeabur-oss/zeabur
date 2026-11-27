@@ -4288,10 +4288,10 @@ export const en = {
   "ports.external": "External port",
   "ports.externalHint":
     "Clients on the internet connect to this port. Leave it empty to use the service port.",
-  "addr.title": "Kubernetes Services",
+  "addr.title": "Addresses",
   "addr.about":
-    "The addresses of this service's Kubernetes Services. Every type has an address in the cluster. A NodePort Service also opens its ports on the nodes. A LoadBalancer Service also gets an address from a load balancer, if the cluster has one.",
-  "addr.outside": "Open outside the cluster",
+    "Where clients connect to this service, for each of its Kubernetes Services. Every Service has an address in the cluster. A NodePort Service also opens its ports on the nodes. A LoadBalancer Service also gets an address from a load balancer, if the cluster supports load balancers.",
+  "addr.internet": "Open to the internet",
   "addr.opens": (from: string) => `Opens ${from} to the internet`,
   "addr.project": "In this project",
   "addr.cluster": "From another project in this cluster",

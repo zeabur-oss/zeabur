@@ -3913,10 +3913,10 @@ export const zhTW: Messages = {
   "ports.port": "連接埠",
   "ports.external": "外部連接埠",
   "ports.externalHint": "網際網路上的用戶端連這個連接埠。留空就用服務的連接埠。",
-  "addr.title": "Kubernetes Service",
+  "addr.title": "連線位址",
   "addr.about":
-    "這個服務的 Kubernetes Service 位址。每種 Service 在叢集內都有位址；NodePort Service 也在節點上開放連接埠；叢集有負載平衡器時，LoadBalancer Service 還會取得它給的位址。",
-  "addr.outside": "對叢集外開放",
+    "用戶端連到這個服務的位址，依 Kubernetes Service 列出。每個 Service 在叢集內都有位址；NodePort Service 也在節點上開放連接埠；叢集支援負載平衡器時，LoadBalancer Service 還會取得負載平衡器分配的位址。",
+  "addr.internet": "對網際網路開放",
   "addr.opens": (from) => `把 ${from} 開放到網際網路`,
   "addr.project": "本專案",
   "addr.cluster": "同叢集的其他專案",

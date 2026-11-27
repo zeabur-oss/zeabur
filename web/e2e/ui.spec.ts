@@ -977,7 +977,7 @@ test("a service without a shell opens a debug terminal through a plan", async ({
 test("Networking shows the short address and the full one", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${healthy}?tab=networking`)
   const panel = page.getByRole("tabpanel", { name: "Networking" })
-  const network = panel.getByRole("region", { name: "Kubernetes Services" })
+  const network = panel.getByRole("region", { name: "Addresses", exact: true })
   await expect(network.getByText(`${healthy}:80`, { exact: true })).toBeVisible()
   await expect(network).toContainText(`${healthy}.${namespace}.svc.cluster.local:80`)
 })
@@ -1014,7 +1014,7 @@ test("a port opened on another external port lists its Service with the load bal
   await page.goto(`${project}/services/Deployment/${healthy}?tab=networking`)
   const services = page
     .getByRole("tabpanel", { name: "Networking" })
-    .getByRole("region", { name: "Kubernetes Services" })
+    .getByRole("region", { name: "Addresses", exact: true })
   await services.getByRole("button", { name: "Open a port" }).click()
   await page.getByRole("textbox", { name: "External port" }).fill("18045")
   await page.getByRole("button", { name: "Review changes", exact: true }).click()
