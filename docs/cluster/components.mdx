@@ -90,6 +90,25 @@ If the exported manifest starts with instructions to disable a built-in version,
 Disabling the built-in Traefik deletes its CRDs and all IngressRoute and Middleware objects. Ingress traffic stops until the replacement component starts. Disabling the built-in metrics-server makes the metrics API unavailable until the new version starts. Schedule the switch for a time when an interruption is acceptable.
 </Callout>
 
+{/* The component pages of oss.zeabur.com/catalog link here by this title and its anchor. Keep both. */}
+
+## Install with an agent
+
+A coding agent such as Claude Code or Codex can install components for you with `zeaburctl components export`. Put the component IDs in this prompt and paste it:
+
+```text
+Install the Zeabur Catalog components <ids> on my cluster. Follow https://oss.zeabur.com/docs/zeabur/cluster/components.md.
+Ask me which kubeconfig context to use, and use it in every kubectl, helm and zeaburctl doctor command (--context, or --kube-context for helm). Use a zeaburctl of the same version as my Zeabur OSS.
+Ask me which format fits my cluster: flux or argocd when Flux or Argo CD manages it, else helmchart on K3s and RKE2, else helm.
+Install only what `zeaburctl components export <ids> --format <format>` prints. Don't choose chart versions, change values or run helm commands of your own.
+Ask me for the value of every <name> placeholder in the output, and put my answer in its place.
+Before each write to the cluster, show me what changes and wait for my go-ahead: the output of `kubectl diff --server-side -f <file>` for a manifest, the exact printed commands for the helm format.
+Each component's output ends with "Zeabur's objects for <id>". Apply those only after that component is installed and its pods are ready.
+When you finish, run `zeaburctl doctor --output json` and report what it says.
+```
+
+The agent asks you for the context, the format and each placeholder, and shows you each change before it applies it. On a cluster that Flux or Argo CD manages, you can have it write the files into the repository Flux or Argo CD syncs from instead.
+
 ## Change settings of built-in components
 
 K3s and RKE2 install some components themselves, such as Traefik. **Installed** shows K3s or RKE2 as their source, and their cards have no **Install** or **Manage** button, because Zeabur OSS changes only components it installed. Don't edit their manifest files in the server's manifests directory: K3s rewrites them every time it starts.

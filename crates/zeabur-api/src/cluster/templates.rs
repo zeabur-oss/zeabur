@@ -11,7 +11,7 @@
 use std::collections::BTreeMap;
 
 use axum::extract::State;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_catalog::templates::{Reference, TemplateInput, TemplateService};
 use zeabur_catalog::{Component, RenderError};
@@ -82,7 +82,7 @@ pub struct Requests {
 }
 
 /// A component a template needs.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Requirement {
     /// The capability (`databases`).
@@ -96,7 +96,7 @@ pub struct Requirement {
 }
 
 /// Whether a component a template needs is there.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum RequirementState {
     /// kube-apiserver serves its API.
