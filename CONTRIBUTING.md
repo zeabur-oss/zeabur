@@ -27,6 +27,7 @@ cargo deny --locked check
 node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy
 node_modules/.bin/zeabur-oss-levels          # crate levels, modules, pure and isolated crates
 ./scripts/check-chart.sh                     # the Helm chart: lint, renderings, refused values
+./scripts/check-database-updater.sh           # Go adapter: vet, race tests and static build
 ./scripts/build-without-ui.sh                # the API-only build, without bun
 (cd web && bun ci && bun run fmt:check)
 ./scripts/check-ui-styles.sh && ./scripts/build-ui.sh   # build-ui.sh type-checks too (tsc -b)

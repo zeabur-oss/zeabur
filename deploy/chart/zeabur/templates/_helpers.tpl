@@ -146,7 +146,7 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- .Values.proxy.tls.existingSecret | default (printf "%s-tls" (include "zeabur.proxyName" .)) -}}
 {{- end -}}
 
-{{/* Keep the suffix even with a 63-character fullname override. */}}
+{{/* Keep the suffix even when the release has a long name. */}}
 {{- define "zeabur.databaseUpdaterName" -}}
 {{- printf "%s-database-updater" (include "zeabur.fullname" . | trunc 46 | trimSuffix "-") -}}
 {{- end -}}
