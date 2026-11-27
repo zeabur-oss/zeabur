@@ -21,9 +21,13 @@ use crate::output;
 /// Options of `zeaburctl connect`.
 #[derive(Debug, clap::Args)]
 pub(crate) struct ConnectArgs {
-    /// The database or service, as `<project>/<name>`; `<project>/<name>:<port>` picks one of a
+    /// The database or service: `<name>`, or `<project>/<name>`. Add `:<port>` to pick one of a
     /// service's ports.
     target: String,
+    /// The project the database or service is in (default: the namespace of the kubeconfig
+    /// context).
+    #[arg(long)]
+    project: Option<String>,
     /// The port to listen on, on 127.0.0.1. Default: a free port.
     #[arg(long, default_value_t = 0)]
     port: u16,
@@ -52,7 +56,16 @@ pub(crate) async fn run(args: &ConnectArgs) -> ExitCode {
 }
 
 async fn connect(args: &ConnectArgs) -> Result<(), String> {
-    let (project, name, port) = parse(&args.target)?;
+    let given = args
+        .project
+        .clone()
+        .or_else(|| zeabur_kube::kubeconfig_namespace(args.context.as_deref()));
+    let Target {
+        project,
+        name,
+        port,
+    } = parse(&args.target, args.project.as_deref(), given)?;
+    let (project, name) = (project.as_str(), name.as_str());
     let client = UserClient::from_kubeconfig(args.context.as_deref())
         .await
         .map_err(|e| e.to_string())?;
@@ -149,19 +162,45 @@ async fn wait() -> Result<(), String> {
         .map_err(|e| format!("cannot wait for Ctrl-C: {e}"))
 }
 
-/// `<project>/<name>[:<port>]`.
-fn parse(target: &str) -> Result<(&str, &str, Option<u16>), String> {
-    let invalid =
-        || format!("Name it as <project>/<name> or <project>/<name>:<port>, not {target}.");
-    let (project, rest) = target.split_once('/').ok_or_else(invalid)?;
+/// What to connect to.
+#[derive(Debug, PartialEq, Eq)]
+struct Target {
+    project: String,
+    name: String,
+    port: Option<u16>,
+}
+
+/// `[<project>/]<name>[:<port>]`. Without `<project>/` the project is `default`: `--project`
+/// (`flag`), else the kubeconfig context's namespace.
+fn parse(target: &str, flag: Option<&str>, default: Option<String>) -> Result<Target, String> {
+    let invalid = || format!("Name it as <name>, <project>/<name> or <name>:<port>, not {target}.");
+    let (project, rest) = match target.split_once('/') {
+        Some((project, rest)) => (Some(project), rest),
+        None => (None, target),
+    };
     let (name, port) = match rest.split_once(':') {
         Some((name, port)) => (name, Some(port.parse().ok().ok_or_else(invalid)?)),
         None => (rest, None),
     };
-    if project.is_empty() || name.is_empty() {
+    if name.is_empty() || project == Some("") {
         return Err(invalid());
     }
-    Ok((project, name, port))
+    let project = match (project, flag) {
+        (Some(named), Some(flag)) if named != flag => {
+            return Err(format!(
+                "{target} is in {named}, but --project is {flag}. Name the project once."
+            ));
+        }
+        (Some(named), _) => named.to_owned(),
+        (None, _) => default.ok_or_else(|| {
+            "Name the project with --project or as <project>/<name>: the kubeconfig context sets no namespace.".to_owned()
+        })?,
+    };
+    Ok(Target {
+        project,
+        name: name.to_owned(),
+        port,
+    })
 }
 
 /// What the API's problem says.
@@ -718,13 +757,57 @@ mod tests {
         }
     }
 
-    #[test]
-    fn the_target_is_a_project_a_name_and_maybe_a_port() {
-        assert_eq!(parse("shop/web").unwrap(), ("shop", "web", None));
-        assert_eq!(parse("shop/web:8080").unwrap(), ("shop", "web", Some(8080)));
-        for wrong in ["web", "shop/", "/web", "shop/web:http", "shop/web:"] {
-            assert!(parse(wrong).is_err(), "{wrong}");
+    fn wanted(project: &str, name: &str, port: Option<u16>) -> Target {
+        Target {
+            project: project.to_owned(),
+            name: name.to_owned(),
+            port,
         }
+    }
+
+    #[test]
+    fn the_target_is_a_name_and_maybe_a_project_and_a_port() {
+        let context = || Some("context".to_owned());
+        assert_eq!(
+            parse("shop/web", None, context()).unwrap(),
+            wanted("shop", "web", None)
+        );
+        assert_eq!(
+            parse("shop/web:8080", None, None).unwrap(),
+            wanted("shop", "web", Some(8080))
+        );
+        assert_eq!(
+            parse("web:8080", None, context()).unwrap(),
+            wanted("context", "web", Some(8080))
+        );
+        for wrong in ["shop/", "/web", "shop/web:http", "web:", ""] {
+            assert!(parse(wrong, None, context()).is_err(), "{wrong}");
+        }
+    }
+
+    #[test]
+    fn without_a_project_in_the_target_it_is_the_flag_then_the_contexts_namespace() {
+        // The caller passes the flag as the default when there is one.
+        assert_eq!(
+            parse("web", Some("shop"), Some("shop".to_owned())).unwrap(),
+            wanted("shop", "web", None)
+        );
+        assert_eq!(
+            parse("web", None, Some("context".to_owned())).unwrap(),
+            wanted("context", "web", None)
+        );
+        let refused = parse("web", None, None).unwrap_err();
+        assert!(refused.contains("--project"), "{refused}");
+    }
+
+    #[test]
+    fn a_project_in_the_target_that_differs_from_the_flag_is_refused() {
+        assert_eq!(
+            parse("shop/web", Some("shop"), Some("shop".to_owned())).unwrap(),
+            wanted("shop", "web", None)
+        );
+        let refused = parse("shop/web", Some("blog"), Some("blog".to_owned())).unwrap_err();
+        assert!(refused.contains("--project"), "{refused}");
     }
 
     #[test]

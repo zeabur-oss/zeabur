@@ -485,14 +485,34 @@ fn kubeconfig_cluster(context: Option<&str>) -> Option<String> {
 }
 
 fn cluster_of(kubeconfig: kube::config::Kubeconfig, context: Option<&str>) -> Option<String> {
+    context_of(kubeconfig, context)
+        .map(|c| c.cluster)
+        .filter(|cluster| !cluster.is_empty())
+}
+
+/// The namespace that the kubeconfig's context `context` (the current one when `None`) sets.
+/// `None` when the context sets none: [`kube::Config`] puts `default` in its place.
+#[must_use]
+pub fn kubeconfig_namespace(context: Option<&str>) -> Option<String> {
+    namespace_of(kube::config::Kubeconfig::read().ok()?, context)
+}
+
+fn namespace_of(kubeconfig: kube::config::Kubeconfig, context: Option<&str>) -> Option<String> {
+    context_of(kubeconfig, context)?
+        .namespace
+        .filter(|namespace| !namespace.is_empty())
+}
+
+fn context_of(
+    kubeconfig: kube::config::Kubeconfig,
+    context: Option<&str>,
+) -> Option<kube::config::Context> {
     let context = context.map(str::to_owned).or(kubeconfig.current_context)?;
     kubeconfig
         .contexts
         .into_iter()
         .find(|named| named.name == context)?
         .context
-        .map(|c| c.cluster)
-        .filter(|cluster| !cluster.is_empty())
 }
 
 /// Why a [`UserClient`] could not be built.
@@ -584,6 +604,27 @@ contexts:
             Some("prod-eu")
         );
         assert_eq!(cluster_of(kubeconfig, Some("gone")), None);
+    }
+
+    #[test]
+    fn only_a_namespace_the_context_sets_is_its_namespace() {
+        let kubeconfig = kube::config::Kubeconfig::from_yaml(
+            "apiVersion: v1
+kind: Config
+current-context: shop
+contexts:
+- name: shop
+  context: {cluster: k3d-dev, user: ci, namespace: shop}
+- name: unset
+  context: {cluster: k3d-dev, user: ci}
+",
+        )
+        .unwrap();
+        assert_eq!(
+            namespace_of(kubeconfig.clone(), None).as_deref(),
+            Some("shop")
+        );
+        assert_eq!(namespace_of(kubeconfig, Some("unset")), None);
     }
 
     #[tokio::test]

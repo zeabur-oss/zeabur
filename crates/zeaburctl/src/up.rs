@@ -61,7 +61,8 @@ pub(crate) struct UpArgs {
     /// The folder to upload (default: the current one).
     #[arg(default_value = ".")]
     folder: PathBuf,
-    /// The project the service is in. Asked for in a terminal when left out.
+    /// The project the service is in (default: the namespace of the kubeconfig context). Asked
+    /// for in a terminal when neither names one.
     #[arg(long)]
     project: Option<String>,
     /// The service, which has a Build of the same name. Asked for in a terminal when left out. It
@@ -128,7 +129,13 @@ async fn up(args: &UpArgs) -> Result<(), String> {
     let info = client.zeabur_info().await.unwrap_or_default();
     let api = local(client, &info).await?;
     let target = Target {
-        project: args.project.clone(),
+        project: args.project.clone().or_else(|| {
+            let namespace = zeabur_kube::kubeconfig_namespace(args.context.as_deref())?;
+            output::info(&format!(
+                "Using project {namespace}, the namespace of the kubeconfig context."
+            ));
+            Some(namespace)
+        }),
         service: args.service.clone(),
         method: args.method,
         port: args.port,

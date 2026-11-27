@@ -6,6 +6,7 @@ use std::net::Ipv4Addr;
 
 use kube::Api;
 use kube::api::{ListParams, PostParams};
+pub(crate) use zeabur_api::settings::ServiceAddress;
 use zeabur_kube::k8s_openapi::api::authorization::v1::{
     ResourceAttributes, SelfSubjectAccessReview, SelfSubjectAccessReviewSpec,
 };
@@ -14,8 +15,6 @@ use zeabur_kube::k8s_openapi::api::discovery::v1::EndpointSlice;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 
 use crate::output;
-
-pub(crate) use zeabur_api::settings::ServiceAddress;
 
 /// Listens on loopback port `local` (any free port for 0) and forwards each connection to a
 /// ready pod of `service`. Gives the port.
