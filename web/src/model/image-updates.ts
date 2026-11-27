@@ -190,14 +190,6 @@ export function dayName(day: number, locale: string, timeZone?: string): string 
   return new Intl.DateTimeFormat(locale, { weekday: "long", timeZone }).format(date)
 }
 
-export const keelKeys = [
-  "keel.sh/policy",
-  "keel.sh/trigger",
-  "keel.sh/pollSchedule",
-  "keel.sh/match-tag",
-  "keel.sh/matchTag",
-] as const
-
 /** An operator object's Keel annotations, using the same settings as registry services. */
 export function readKeelUpdates(
   annotations: Record<string, string>,
@@ -222,16 +214,4 @@ export function readKeelUpdates(
     return { allowed, setting: { kind: "image", policy: "sameTag", ...(window ? { window } : {}) } }
   }
   return { allowed, setting: { kind: "other", policy, schedule } }
-}
-
-/** The settings shared with a registry service; off removes them. */
-export function keelAnnotations(update: Schemas.Update): Record<string, string> {
-  if (update.kind !== "image") return {}
-  const day = update.window?.day ? weekdays.indexOf(update.window.day) : "*"
-  return {
-    "keel.sh/policy": update.policy === "sameTag" ? "force" : update.policy,
-    "keel.sh/trigger": "poll",
-    "keel.sh/pollSchedule": update.window ? `0 0 ${update.window.hour} * * ${day}` : "@hourly",
-    ...(update.policy === "sameTag" ? { "keel.sh/match-tag": "true" } : {}),
-  }
 }

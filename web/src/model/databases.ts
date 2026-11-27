@@ -28,7 +28,7 @@ import { getExportDatabaseUrl } from "@/api/zeabur"
 import type { Translate } from "@/i18n"
 import { fits, textProblem } from "@/model/rules"
 import { AWS_KEYS, keysSecret, needsKeys, type S3Target } from "@/model/s3-destinations"
-import { keelAnnotations, keelKeys, readKeelUpdates } from "@/model/image-updates"
+import { readKeelUpdates } from "@/model/image-updates"
 import type { Event, Health } from "@/model/service"
 
 export type Database = Schemas.Database
@@ -1804,26 +1804,7 @@ export function databaseImageUpdates(database: Database): Schemas.ImageUpdates {
   )
 }
 
-/** A reviewed edit keeps the Cluster's image, storage and backups while changing Keel settings. */
+/** The server reads the current Cluster before planning its update settings. */
 export function updateDatabaseImages(database: Database, update: Schemas.Update): Change[] {
-  const object = structuredClone(database.object) as {
-    metadata: { annotations?: Record<string, string>; labels?: Record<string, string> }
-  }
-  const annotations = { ...object.metadata.annotations }
-  for (const key of keelKeys) {
-    delete annotations[key]
-    if (object.metadata.labels) delete object.metadata.labels[key]
-  }
-  Object.assign(annotations, keelAnnotations(update))
-  if (Object.keys(annotations).length) object.metadata.annotations = annotations
-  else delete object.metadata.annotations
-  const { group, version, resource } = databaseAddress(database)
-  return [
-    {
-      op: "edit",
-      resource: { group, version, resource },
-      name: database.name,
-      yaml: JSON.stringify(object),
-    },
-  ]
+  return [{ op: "autoUpdate", workload: { kind: "Cluster", name: database.name }, update }]
 }

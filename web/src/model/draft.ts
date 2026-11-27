@@ -48,7 +48,7 @@ export const partOrder: DraftPart[] = [
 export const draftable = (changes: readonly Change[]) =>
   changes.length > 0 && changes.every((c) => partOf(c) !== undefined)
 
-const workloadKey = (w: Schemas.WorkloadRef) => `${w.kind}/${w.name}`
+const workloadKey = (w: Schemas.AutoUpdateTarget) => `${w.kind}/${w.name}`
 
 type Keys = { [Op in Change["op"]]?: (change: Extract<Change, { op: Op }>) => string }
 

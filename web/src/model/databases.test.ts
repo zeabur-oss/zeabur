@@ -4,6 +4,7 @@ import type { Schemas } from "@/api/client"
 import { actionOf, describe as describePlan } from "@/components/plan/describe"
 import { databaseLink } from "@/lib/place"
 import { databaseNodes } from "@/model/database-parts"
+import { mergeChanges } from "@/model/draft"
 import type { Translate } from "@/i18n"
 
 import {
@@ -62,7 +63,7 @@ describe("CloudNativePG automatic updates", () => {
       name: "pg",
       namespace: "shop",
       resourceVersion: "42",
-      annotations: { unrelated: "keep" },
+      annotations: { "kubectl.kubernetes.io/last-applied-configuration": "{}" },
     },
     spec: {
       imageName: image,
@@ -84,64 +85,82 @@ describe("CloudNativePG automatic updates", () => {
       { imageName: "ghcr.io/cloudnative-pg/postgresql:latest" },
       { imageName: image, imageCatalogRef: { name: "external", major: 18 } },
     ]) {
-      expect(
-        databaseImageUpdates({
-          ...db,
-          object: { ...object, spec } as unknown as Database["object"],
-        }).allowed,
-      ).toEqual([])
+      const changed = {
+        ...db,
+        object: { ...object, spec } as unknown as Database["object"],
+      }
+      expect(databaseImageUpdates(changed).allowed).toEqual([])
+      expect(updateDatabaseImages(changed, { kind: "off" })).toEqual([
+        { op: "autoUpdate", workload: { kind: "Cluster", name: db.name }, update: { kind: "off" } },
+      ])
     }
     expect(databaseImageUpdates({ ...db, apiGroup: "another.operator" }).allowed).toEqual([])
   })
 
-  test("the reviewed edit keeps the image pin, storage, backups and read version", () => {
+  test("settings requests never replay the Cluster snapshot, including its last-applied annotation", () => {
     const db = database()
-    const [change] = updateDatabaseImages(db, {
+    const update = {
       kind: "image",
       policy: "sameTag",
       window: { day: "sunday", hour: 3 },
-    })
-    expect(change?.op).toBe("edit")
-    if (change?.op !== "edit") throw new Error("expected reviewed edit")
-    const edited = JSON.parse(change.yaml)
-    expect(edited.spec).toEqual(object.spec)
-    expect(edited.metadata.resourceVersion).toBe("42")
-    expect(edited.metadata.annotations).toEqual({
-      unrelated: "keep",
-      "keel.sh/policy": "force",
-      "keel.sh/match-tag": "true",
-      "keel.sh/trigger": "poll",
-      "keel.sh/pollSchedule": "0 0 3 * * 0",
-    })
-    expect(databaseImageUpdates({ ...db, object: edited }).setting).toEqual({
-      kind: "image",
-      policy: "sameTag",
-      window: { day: "sunday", hour: 3 },
-    })
-    const [off] = updateDatabaseImages({ ...db, object: edited }, { kind: "off" })
-    if (off?.op !== "edit") throw new Error("expected reviewed edit")
-    expect(JSON.parse(off.yaml)).toEqual(object)
+    } as const
+    const workload = { kind: "Cluster", name: db.name } as const
+    expect(updateDatabaseImages(db, update)).toEqual([{ op: "autoUpdate", workload, update }])
+    expect(updateDatabaseImages(db, { kind: "off" })).toEqual([
+      { op: "autoUpdate", workload, update: { kind: "off" } },
+    ])
     expect(db.object).toEqual(object)
+  })
+
+  test("Off uses the same operation for settings from valid legacy labels", () => {
+    const db = database()
     const labelled = {
       ...db,
       object: {
         ...object,
         metadata: {
           ...object.metadata,
+          annotations: { ...object.metadata.annotations, "keel.sh/pollSchedule": "@every 1h" },
           labels: {
             "keel.sh/policy": "force",
             "keel.sh/matchTag": "true",
             "keel.sh/trigger": "poll",
-            "keel.sh/pollSchedule": "@hourly",
             team: "platform",
           },
         },
       } as unknown as Database["object"],
     }
     expect(databaseImageUpdates(labelled).setting?.kind).toBe("other")
-    const [labelOff] = updateDatabaseImages(labelled, { kind: "off" })
-    if (labelOff?.op !== "edit") throw new Error("expected reviewed edit")
-    expect(JSON.parse(labelOff.yaml).metadata.labels).toEqual({ team: "platform" })
+    expect(updateDatabaseImages(labelled, { kind: "off" })).toEqual([
+      { op: "autoUpdate", workload: { kind: "Cluster", name: db.name }, update: { kind: "off" } },
+    ])
+  })
+
+  test("a later database update replaces only that Cluster's draft settings", () => {
+    const db = database()
+    const service: Schemas.Change = {
+      op: "autoUpdate",
+      workload: { kind: "Deployment", name: db.name },
+      update: { kind: "off" },
+    }
+    const enable = updateDatabaseImages(db, { kind: "image", policy: "sameTag" })
+    const disable = updateDatabaseImages(db, { kind: "off" })
+    expect(mergeChanges([...enable, service], disable)).toEqual([...disable, service])
+  })
+
+  test("the semantic review names the database and its requested schedule or Off", () => {
+    const t = ((key: string, ...args: unknown[]) =>
+      args.length > 0 ? `${key}(${args.join(", ")})` : key) as unknown as Translate
+    const review = (update: Schemas.Update) => {
+      const ask = { changes: updateDatabaseImages(database(), update) }
+      return describePlan(t, ask, { objects: [], impact: [], warnings: [] }, () => undefined)
+    }
+    expect(review({ kind: "image", policy: "sameTag", window: { hour: 3 } }).lines).toEqual([
+      "confirm.imageUpdates(pg, sameTag, imageUpdates.window.daily(03:00))",
+    ])
+    const off = review({ kind: "off" })
+    expect(off.lines).toEqual(["confirm.autoUpdateOff(pg)"])
+    expect(off.action).toBe("action.autoUpdateOff")
   })
 })
 

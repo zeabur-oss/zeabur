@@ -75,7 +75,8 @@ export function destinationOf(
       : undefined
   const object = () => objectLink(project, plan)
   const own = workloadTab[change.op]
-  if (own && "workload" in change) return tab(change.workload ?? undefined, own)
+  if (own && "workload" in change && change.workload?.kind !== "Cluster")
+    return tab(change.workload ?? undefined, own)
   const place = projectPlace[change.op]
   if (place) return place(encodeURIComponent(project))
   switch (change.op) {
