@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import type { Schemas } from "@/api/client"
+import type { Translate } from "@/i18n"
 import {
   covers,
   hourOf,
@@ -10,6 +11,7 @@ import {
   locationProblems,
   locationRequest,
   pickLocation,
+  writeThing,
   scheduleForm,
   scheduleProblems,
   scheduleRequest,
@@ -167,4 +169,27 @@ test("coverage and the last good backup", () => {
   expect(lastGood([backup("failed"), backup("partiallyFailed"), backup("succeeded")])?.name).toBe(
     "zeabur-partiallyFailed",
   )
+})
+
+describe("a plan's lines", () => {
+  const t = ((key: string, ...args: unknown[]) =>
+    args.length > 0 ? `${key}(${args.join(", ")})` : key) as unknown as Translate
+  const write = (kind: string, name: string, namespace?: string) =>
+    ({ action: "create", kind, name, namespace }) as Schemas.BackupWrite
+
+  test("name the CA certificate apart from the storage keys", () => {
+    expect(writeThing(t, write("Secret", "zeabur-backup-ca", "velero"))).toBe(
+      "clusterBackups.thing.caSecret",
+    )
+    expect(writeThing(t, write("Secret", "zeabur-backup-credentials", "velero"))).toBe(
+      "clusterBackups.thing.Secret",
+    )
+  })
+
+  test("name a route by its namespace and a project by its name", () => {
+    expect(writeThing(t, write("HTTPRoute", "web", "shop"))).toBe(
+      "clusterBackups.thing.route(shop, web)",
+    )
+    expect(writeThing(t, write("Namespace", "shop"))).toBe("clusterBackups.thing.Namespace(shop)")
+  })
 })

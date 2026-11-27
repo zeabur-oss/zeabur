@@ -28,7 +28,6 @@ import { formatDate } from "@/lib/format"
 import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
 import {
-  CA_SECRET,
   hourOf,
   insideCluster,
   lastGood,
@@ -49,6 +48,7 @@ import {
   type LocationProblem,
   type ScheduleForm,
   type ScheduleProblem,
+  writeThing,
 } from "@/model/cluster-backups"
 import { restoreEntry } from "@/model/restore-copy"
 import type { Gate } from "@/model/rights"
@@ -927,32 +927,12 @@ function PlanDialog({
 function Planned({ writes }: { writes: Schemas.BackupWrite[] }) {
   const t = useT()
   if (writes.length === 0) return <p>{t("clusterBackups.plan.nothing")}</p>
-  const thing = (write: Schemas.BackupWrite) => {
-    switch (write.kind) {
-      case "Backup":
-      case "Restore":
-      case "Namespace":
-      case "ConfigMap":
-        return t(`clusterBackups.thing.${write.kind}`, write.name)
-      case "Ingress":
-      case "HTTPRoute":
-        return t("clusterBackups.thing.route", write.namespace ?? "", write.name)
-      case "Secret":
-        return t(
-          write.name === CA_SECRET
-            ? "clusterBackups.thing.caSecret"
-            : "clusterBackups.thing.Secret",
-        )
-      default:
-        return t(`clusterBackups.thing.${write.kind as "Secret"}`)
-    }
-  }
   return (
     <>
       <ul className="flex flex-col gap-1">
         {writes.map((w) => (
           <li key={`${w.action}/${w.kind}/${w.namespace ?? ""}/${w.name}`}>
-            {t(`clusterBackups.plan.${w.action}`, thing(w))}
+            {t(`clusterBackups.plan.${w.action}`, writeThing(t, w))}
           </li>
         ))}
       </ul>

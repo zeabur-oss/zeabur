@@ -1,6 +1,7 @@
 // The cluster's Velero backups as the Backups tab tells them: one verdict first, then where
 // backups go, when they run, and how each went.
 import type { Schemas } from "@/api/client"
+import type { Translate } from "@/i18n"
 import { rules } from "@/api/rules"
 import { getDownloadClusterBackupUrl } from "@/api/zeabur"
 import { fits } from "@/model/rules"
@@ -21,9 +22,6 @@ export function mainLocation(data: Data): Location | undefined {
 export function mainSchedule(data: Data): Schedule | undefined {
   return data.schedules.find((s) => s.zeabur)
 }
-
-/** The Secret a location's CA certificate is written to. */
-export const CA_SECRET = "zeabur-backup-ca"
 
 export const outcomeHealth: Record<Schemas.BackupOutcome, Health> = {
   succeeded: "ok",
@@ -212,3 +210,26 @@ export const backupDownloadUrl = getDownloadClusterBackupUrl
 /** The backup provider of `module` (`k8up`, `velero`). */
 export const providerOf = (providers: Schemas.BackupProvider[] | undefined, module: string) =>
   providers?.find((p) => p.module === module)
+
+/** The Secret a location's CA certificate is written to. */
+const CA_SECRET = "zeabur-backup-ca"
+
+/** What a plan's write is, as its line says it: "the storage keys", "project shop". */
+export function writeThing(t: Translate, write: Schemas.BackupWrite): string {
+  switch (write.kind) {
+    case "Backup":
+    case "Restore":
+    case "Namespace":
+    case "ConfigMap":
+      return t(`clusterBackups.thing.${write.kind}`, write.name)
+    case "Ingress":
+    case "HTTPRoute":
+      return t("clusterBackups.thing.route", write.namespace ?? "", write.name)
+    case "Secret":
+      return t(
+        write.name === CA_SECRET ? "clusterBackups.thing.caSecret" : "clusterBackups.thing.Secret",
+      )
+    default:
+      return t(`clusterBackups.thing.${write.kind as "Secret"}`)
+  }
+}
