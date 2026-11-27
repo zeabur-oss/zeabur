@@ -1819,9 +1819,10 @@ mod tests {
         // `list`) must never become one, and two handlers sharing an id would type one path's
         // answer as the other's.
         const VERBS: &[&str] = &[
-            "apply", "check", "convert", "create", "delete", "download", "export", "follow", "get",
-            "inspect", "list", "make", "open", "plan", "preview", "remove", "rename", "reveal",
-            "revoke", "set", "start", "trace", "upload",
+            "abort", "apply", "check", "complete", "convert", "count", "create", "delete",
+            "download", "export", "follow", "get", "inspect", "list", "make", "open", "plan",
+            "preview", "remove", "rename", "reveal", "revoke", "send", "set", "start", "trace",
+            "upload",
         ];
         let description = serde_json::to_value(zeabur_api::openapi()).unwrap();
         let mut seen = std::collections::BTreeSet::new();
