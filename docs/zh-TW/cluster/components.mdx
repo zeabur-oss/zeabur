@@ -90,6 +90,25 @@ zeaburctl components export velero --format helm
 停用內建的 Traefik 會刪除 Traefik 的 CRD 和所有 IngressRoute、Middleware 物件，新的元件開始執行前，Ingress 流量會中斷。停用內建的 metrics-server 時，新版本開始執行前 metrics API 無法使用。挑可以中斷的時段切換。
 </Callout>
 
+{/* oss.zeabur.com/catalog 的元件頁用這個標題和它的錨點連到這裡，兩個都不要改。 */}
+
+## 交給 Agent 安裝
+
+Claude Code 或 Codex 這類 Coding Agent 可以用 `zeaburctl components export` 替你安裝元件。把元件 ID 填進這段提示再貼上：
+
+```text
+在我的叢集安裝 Zeabur Catalog 元件 <ids>，照著 https://oss.zeabur.com/zh-TW/docs/zeabur/cluster/components.md 做。
+先問我要用哪個 kubeconfig context，每個 kubectl、helm 和 zeaburctl doctor 指令都指定它（helm 用 --kube-context，其他用 --context）。zeaburctl 要和我的 Zeabur 開源版同一個版本。
+問我叢集適合哪種格式：由 Flux 或 Argo CD 管理的用 flux 或 argocd，不是的話 K3s 和 RKE2 用 helmchart，其他用 helm。
+只安裝 `zeaburctl components export <ids> --format <格式>` 印出的內容。不要自己挑 chart 版本、改設定值，也不要執行輸出以外的 helm 指令。
+輸出裡每個 <名稱> 佔位符的值都要問我，再把我的回答填進去。
+每次寫入叢集前，先給我看會改什麼，等我同意：manifest 給我看 `kubectl diff --server-side -f <檔案>` 的結果，helm 格式給我看輸出裡要執行的指令。
+每個元件的輸出最後是「Zeabur's objects for <id>」那段，要等那個元件裝好、Pod 都就緒後再套用。
+做完後執行 `zeaburctl doctor --output json`，告訴我它找到的問題。
+```
+
+Agent 會問你 context、格式和每個佔位符的值，每個改動都先給你看，你同意後才套用。由 Flux 或 Argo CD 管理的叢集，可以請它把檔案寫進 Flux 或 Argo CD 同步的儲存庫，不直接套用。
+
 ## 修改內建元件的設定
 
 K3s 和 RKE2 會自己安裝一些元件，例如 Traefik。**已安裝**裡這些元件的來源是 K3s 或 RKE2，卡片上沒有**安裝**或**管理**按鈕，因為 Zeabur 開源版只管理自己安裝的元件。不要改 server 上 manifests 目錄裡內建元件的 manifest 檔案，K3s 每次啟動都會重新寫一次。
