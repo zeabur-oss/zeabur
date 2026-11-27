@@ -45,6 +45,11 @@ pub const BUILDER_GROUP: &str = "builder.zeabur.com";
 pub const BUILDER_VERSION: &str = "v1alpha1";
 /// The annotation whose new value builds a `Build` again.
 pub const REBUILD: &str = "builder.zeabur.com/rebuild";
+/// The annotation whose value Zeabur Builder links the commit status of each build to
+/// ([builder#273]): Zeabur sets it to the service's Builds tab.
+///
+/// [builder#273]: https://github.com/zeabur-oss/builder/pull/273
+pub const DETAILS_URL: &str = "builder.zeabur.com/details-url";
 /// The annotation whose new value asks for a token to upload an archive.
 pub const UPLOAD_TOKEN_REQUEST: &str = "builder.zeabur.com/upload-token-request";
 /// The label Zeabur Builder reads credentials by.

@@ -19,6 +19,10 @@
 //!
 //! An uploaded folder's `Build` carries the annotation that asks Zeabur Builder for an upload
 //! token; the client uploads the folder after the plan.
+//!
+//! When Zeabur has a public URL, the `Build` that [`crate::Change::CreateBuiltService`] or
+//! [`crate::Change::SetBuild`] writes carries [`DETAILS_URL`]: the service's Builds tab, which
+//! Zeabur Builder links its commit statuses to.
 
 use std::collections::BTreeMap;
 
@@ -30,7 +34,7 @@ use zeabur_graph::Workload;
 use zeabur_model::{ImageUpdates, PodSecurityLevel, UpdateSetting, WorkloadKind, WorkloadRef};
 
 use crate::builds::{
-    BUILDER_GROUP, BUILDER_VERSION, GIT_CREDENTIALS_LABEL, KEEL_FORCE, KEEL_POLICY,
+    BUILDER_GROUP, BUILDER_VERSION, DETAILS_URL, GIT_CREDENTIALS_LABEL, KEEL_FORCE, KEEL_POLICY,
     UPLOAD_TOKEN_REQUEST, build_path, builds,
 };
 use crate::change::{BuildMethod, DataEdit, DataKind, NameValue, ServiceSize, Update};
@@ -40,8 +44,9 @@ use crate::image_service::{
     ImageServiceChange, check_host, check_name, check_variable_names, image_objects, labels_of,
     opaque_secret, plain_variables, refused,
 };
-use crate::json::{add, replace, test};
+use crate::json::{add, pointer, replace, test};
 use crate::plan::{ErrorKind, PlanError, Planner, error, to_json};
+use crate::project::{set_key, shown, steps};
 use crate::rules::{EnvEdit, EnvValueFrom};
 
 /// The tag the Deployment names until the first build.
@@ -748,8 +753,14 @@ impl BuildInput {
     }
 
     /// The new `Build` `name` that builds `source` and pushes to `repository`, its variables read
-    /// from `<name>-build-env`.
-    fn build(&self, name: &str, repository: String, source: SourceSpec) -> Build {
+    /// from `<name>-build-env`, linked to `details` (see [`DETAILS_URL`]).
+    fn build(
+        &self,
+        name: &str,
+        repository: String,
+        source: SourceSpec,
+        details: Option<String>,
+    ) -> Build {
         let secret = variables_name(name);
         let env = self
             .build_variables
@@ -767,20 +778,22 @@ impl BuildInput {
                 }),
             })
             .collect();
-        let annotations = match &self.source {
-            BuildSource::Upload { request } => Some(BTreeMap::from([(
-                UPLOAD_TOKEN_REQUEST.to_owned(),
-                request.clone(),
-            )])),
+        let annotations: BTreeMap<String, String> = match &self.source {
+            BuildSource::Upload { request } => {
+                Some((UPLOAD_TOKEN_REQUEST.to_owned(), request.clone()))
+            }
             BuildSource::Git { .. } => None,
-        };
+        }
+        .into_iter()
+        .chain(details.map(|url| (DETAILS_URL.to_owned(), url)))
+        .collect();
         Build {
             api_version: format!("{BUILDER_GROUP}/{BUILDER_VERSION}"),
             kind: "Build",
             metadata: ObjectMeta {
                 name: Some(name.to_owned()),
                 labels: Some(labels_of(name)),
-                annotations,
+                annotations: (!annotations.is_empty()).then_some(annotations),
                 ..ObjectMeta::default()
             },
             spec: BuildSpec {
@@ -816,6 +829,38 @@ impl<'a> Planner<'a> {
             "{}/{project}/{name}",
             registry.trim_end_matches('/')
         ))
+    }
+
+    /// The Builds tab of the service `kind`/`name` in the project, when Zeabur has a public URL.
+    fn builds_tab(&self, kind: WorkloadKind, name: &str) -> Option<String> {
+        self.input.public_url.map(|base| {
+            format!(
+                "{}/projects/{}/services/{}/{name}?tab=builds",
+                base.trim_end_matches('/'),
+                self.input.snapshot.namespace,
+                kind.as_str(),
+            )
+        })
+    }
+
+    /// Sets [`DETAILS_URL`] of the `Build` at `at` to `url`, unless it has that value.
+    fn link_build(&mut self, at: usize, url: &str) -> Result<(), PlanError> {
+        let current = self.current(at);
+        let path = pointer(&["metadata", "annotations", DETAILS_URL]);
+        let before = current.pointer(&path).cloned();
+        if before.as_ref().and_then(Value::as_str) == Some(url) {
+            return Ok(());
+        }
+        self.claim(
+            at,
+            &steps("annotations", DETAILS_URL),
+            &shown("annotations", DETAILS_URL),
+        )?;
+        let operations = before.map_or_else(
+            || set_key(&current, "annotations", DETAILS_URL, url),
+            |before| vec![test(&path, before), replace(&path, json!(url))],
+        );
+        self.patch(at, operations)
     }
 
     pub(crate) fn create_built_service(
@@ -866,7 +911,8 @@ impl<'a> Planner<'a> {
         for object in image_objects(&service, self.input.cluster_issuer, Some(keel))? {
             self.create_object(&object, index)?;
         }
-        let build = change.build.build(name, repository, source);
+        let details = self.builds_tab(WorkloadKind::Deployment, name);
+        let build = change.build.build(name, repository, source, details);
         self.create_object(&to_json(&build)?, index)
     }
 
@@ -894,15 +940,16 @@ impl<'a> Planner<'a> {
         let existing = current.is_some();
         // The image it made last, which the container runs until the next build.
         let latest = current.and_then(|read| read.status.latest_image);
+        let details = self.builds_tab(reference.kind, name);
         let (pushes_to, build_changed) = if existing {
-            self.update_build(name, &change.build, source, credentials, index)?
+            self.update_build(name, &change.build, source, credentials, details, index)?
         } else {
             let pushes_to = self.repository(name)?;
             if let Some(secret) = credentials {
                 self.create_object(&to_json(&secret)?, index)?;
             }
             self.build_variables(name, &change.build.build_variables, false, index)?;
-            let build = change.build.build(name, pushes_to.clone(), source);
+            let build = change.build.build(name, pushes_to.clone(), source, details);
             self.create_object(&to_json(&build)?, index)?;
             (pushes_to, true)
         };
@@ -940,13 +987,15 @@ impl<'a> Planner<'a> {
     }
 
     /// Gives the `Build` `name` that exists `build`'s source, method and paths, writing the
-    /// credentials it reads; returns the repository it pushes to and whether it changes anything.
+    /// credentials it reads, and links it to `details`; returns the repository it pushes to and
+    /// whether it changes anything.
     fn update_build(
         &mut self,
         name: &str,
         build: &BuildInput,
         mut source: SourceSpec,
         credentials: Option<Secret>,
+        details: Option<String>,
         index: usize,
     ) -> Result<(String, bool), PlanError> {
         let at = self.build(name)?;
@@ -989,6 +1038,9 @@ impl<'a> Planner<'a> {
             }
         }
         self.patch(at, operations)?;
+        if let Some(url) = &details {
+            self.link_build(at, url)?;
+        }
         if let BuildSource::Upload { request } = &build.source {
             self.upload_token(name, request)?;
         }

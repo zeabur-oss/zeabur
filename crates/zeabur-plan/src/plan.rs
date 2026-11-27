@@ -124,6 +124,9 @@ pub struct Input<'a> {
     /// The registry Zeabur Builder pushes to and nodes pull from (`builds.registry`); `None`:
     /// services are not built in this cluster.
     pub build_registry: Option<&'a str>,
+    /// The URL people open Zeabur at (`--public-url`), without a trailing slash; `None`: a
+    /// `Build` Zeabur writes gets no link to its service's Builds tab.
+    pub public_url: Option<&'a str>,
     /// The largest allocatable memory and CPU of one node, which a build limit may not pass;
     /// `None` when the nodes could not be read.
     pub node_capacity: Option<NodeCapacity>,
@@ -169,6 +172,7 @@ impl<'a> Input<'a> {
             certificates: &NO_CERTIFICATES,
             platform_namespaces: false,
             build_registry: None,
+            public_url: None,
             node_capacity: None,
         }
     }
