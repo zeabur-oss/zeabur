@@ -6490,6 +6490,26 @@ components:
             $ref: "#/components/schemas/WorkloadRef"
             description: "The workload: a Deployment, StatefulSet or DaemonSet."
       - type: object
+        description: |-
+          Put a workload in a group, or take it out, by its group label (`zeabur.com/group`). The
+          label is on the workload, not its pod template, so nothing restarts.
+        required:
+        - workload
+        - op
+        properties:
+          group:
+            type:
+            - string
+            - "null"
+            description: The group; absent takes the workload out of its group.
+          op:
+            type: string
+            enum:
+            - group
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
         description: Run this many pods of a Deployment or StatefulSet.
         required:
         - workload
@@ -7115,6 +7135,11 @@ components:
         group:
           type: string
           description: The group the workload is listed in.
+        grouped:
+          type: boolean
+          description: |-
+            Whether `group` comes from the group label (`zeabur.com/group`). Else it comes from the
+            chart's component label, the database or operator the workload runs for, or is `default`.
         managedBy:
           oneOf:
           - $ref: "#/components/schemas/ManagedBy"

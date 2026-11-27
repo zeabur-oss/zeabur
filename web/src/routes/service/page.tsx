@@ -93,6 +93,7 @@ const tabIcons: Record<Page, Icon> = {
 const tabOfPart: Record<DraftPart, Page> = {
   networking: "networking",
   variables: "variables",
+  group: "settings",
   build: "settings",
   updates: "settings",
   schedule: "settings",

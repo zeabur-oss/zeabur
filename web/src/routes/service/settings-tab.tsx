@@ -34,6 +34,11 @@ const ImageUpdates = lazy(() =>
     default: m.ImageUpdatesSection,
   })),
 )
+const Group = lazy(() =>
+  import("@/routes/service/group").then((m) => ({
+    default: m.GroupSection,
+  })),
+)
 const Security = lazy(() =>
   import("@/routes/service/security").then((m) => ({
     default: m.SecuritySection,
@@ -55,7 +60,7 @@ const HealthChecks = lazy(() =>
   })),
 )
 
-/** Build, automatic updates, schedule, compute, health checks, storage, security and scheduled tasks, one under the other;
+/** Group, build, automatic updates, schedule, compute, health checks, storage, security and scheduled tasks, one under the other;
  * edits other than the build's wait in the draft. */
 export function SettingsTab({
   project,
@@ -100,6 +105,9 @@ export function SettingsTab({
       {/* Kept while the YAML shows, so edits typed here stay in the draft. */}
       <div key={draft?.generation} hidden={mode === "yaml"} className="flex min-w-0 flex-col gap-8">
         <Suspense fallback={<LoadingRows label={t("common.loading")} rows={4} />}>
+          <Part id="group">
+            <Group project={project} service={service} />
+          </Part>
           {parts.includes("build") ? (
             <Part id="build">
               <BuildSection project={project} service={service} builds={builds} />
@@ -148,6 +156,7 @@ export function SettingsTab({
 function partsOf(service: Service, built: boolean): SettingsPart[] {
   // A long-running service without a Build may connect a repository there.
   return [
+    "group",
     ...(built || !isTask(service.kind) ? (["build"] as const) : []),
     // A built service deploys its new builds, which the Build tab turns on.
     ...(!built && service.imageUpdates ? (["updates"] as const) : []),

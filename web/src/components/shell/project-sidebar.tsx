@@ -233,7 +233,8 @@ function Services({ project, data }: { project: string; data: Project }) {
       current={!place.entry && place.service === serviceId(service)}
     />
   )
-  if (groups.length === 1) return <>{groups[0]?.services.map((s) => row(s, false))}</>
+  if (groups.length === 1 && groups[0]?.role)
+    return <>{groups[0].services.map((s) => row(s, false))}</>
   const many = data.services.length > OPEN_ALL
   return (
     <>
@@ -245,8 +246,10 @@ function Services({ project, data }: { project: string; data: Project }) {
           <Tooltip content={roleKube[group.role]}>
             <span>{t(`role.${group.role}`)}</span>
           </Tooltip>
-        ) : (
+        ) : group.name ? (
           <span translate="no">{group.name}</span>
+        ) : (
+          <span>{t("project.ungrouped")}</span>
         )
         return (
           <SidebarMenu

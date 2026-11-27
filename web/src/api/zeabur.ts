@@ -2399,6 +2399,16 @@ export type Change =
       workload: WorkloadRef
     }
   | {
+      /**
+       * The group; absent takes the workload out of its group.
+       * @nullable
+       */
+      group?: string | null
+      op: "group"
+      /** The workload. */
+      workload: WorkloadRef
+    }
+  | {
       op: "scale"
       /** The replicas. */
       replicas: number
@@ -2785,6 +2795,11 @@ export type Classification = {
   displayName?: string | null
   /** The group the workload is listed in. */
   group: string
+  /**
+   * Whether `group` comes from the group label (`zeabur.com/group`). Else it comes from the
+   * chart's component label, the database or operator the workload runs for, or is `default`.
+   */
+  grouped?: boolean
   managedBy?: ManagedBy | null
 }
 

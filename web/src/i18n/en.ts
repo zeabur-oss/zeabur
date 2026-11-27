@@ -556,6 +556,7 @@ export const en = {
   "project.services": "Services",
   "project.events": "Events",
   "project.noServices": "No services yet",
+  "project.ungrouped": "Ungrouped",
   "project.seeObjects": "View all objects",
   "project.healthyOf": (healthy: number, total: number) => `${healthy}/${total} healthy`,
   "project.deleting": "Deleting…",
@@ -1848,6 +1849,9 @@ export const en = {
     `Zeabur Builder builds ${build} from the folder you uploaded.`,
   "confirm.autoUpdateOn": (service: string) =>
     `Each new build of ${service} will go live as soon as it finishes.`,
+  "confirm.group": (service: string, group: string) =>
+    `${service} moves to the ${group} group in the sidebar. Nothing restarts.`,
+  "confirm.ungroup": (service: string) => `${service} leaves its group. Nothing restarts.`,
   "confirm.autoUpdateOff": (service: string) =>
     `${service} no longer updates on its own. You deploy each new version yourself.`,
   "confirm.imageUpdates": (service: string, policy: ImagePolicyKey, when?: string) =>
@@ -4052,6 +4056,14 @@ export const en = {
   "part.build": "Build",
   "part.health-checks": "Health checks",
   "part.security": "Security",
+  "part.group": "Group",
+  "group.hint": "The sidebar lists the services of one group together.",
+  "group.name": "Group name",
+  "group.nameHint":
+    "Pick a group or type a new name. Leave it empty to take the service out of its group.",
+  "group.placeholder": "e.g. shop",
+  "group.invalid":
+    "Use at most 63 characters: a–z, A–Z, 0–9, -, _ or ., starting and ending with a letter or digit.",
   "part.updates": "Automatic updates",
   "part.tasks": "Scheduled tasks",
   "part.schedule": "Schedule",

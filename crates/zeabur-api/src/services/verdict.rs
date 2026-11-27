@@ -146,6 +146,7 @@ mod tests {
                 namespace: "p".to_owned(),
                 classification: Classification {
                     group: "default".to_owned(),
+                    grouped: false,
                     display_name: None,
                     managed_by: None,
                 },

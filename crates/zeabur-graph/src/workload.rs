@@ -284,6 +284,7 @@ pub fn classify_with(workload: Workload<'_>, conventions: &Conventions) -> Class
     if let Some(cluster) = database_cluster(meta) {
         return Classification {
             group: explicit.unwrap_or(DATABASES_GROUP).to_owned(),
+            grouped: explicit.is_some(),
             display_name: cluster.holds_data.then(|| cluster.name.to_owned()),
             managed_by: Some(ManagedBy {
                 kind: cluster.kind.to_owned(),
@@ -308,6 +309,7 @@ pub fn classify_with(workload: Workload<'_>, conventions: &Conventions) -> Class
             resolve_group_with(labels, conventions)
         }
         .to_owned(),
+        grouped: explicit.is_some(),
         display_name: None,
         managed_by: None,
     }

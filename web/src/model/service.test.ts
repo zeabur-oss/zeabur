@@ -5,6 +5,7 @@ import {
   canonicalKind,
   domainsOf,
   envSecretsOf,
+  groupServices,
   imageParts,
   imageTag,
   serviceOfPod,
@@ -155,5 +156,28 @@ describe("an image reference", () => {
     expect(imageTag(`r.example.com/web:main-1@${DIGEST}`)).toBe("main-1")
     expect(imageTag(`r.example.com/web@${DIGEST}`)).toBe("0123456789ab")
     expect(imageTag("r.example.com:5000/web")).toBe("latest")
+  })
+})
+
+describe("grouping services in the sidebar", () => {
+  const names = (services: Service[]) =>
+    groupServices(services).map((g) => [g.name ?? g.role ?? "", g.services.map((s) => s.name)])
+
+  test("one named group lists the rest as ungrouped", () => {
+    const shop = service("shop", { group: "shop", grouped: true })
+    const api = service("api", { group: "default" })
+    expect(names([api, shop])).toStrictEqual([
+      ["shop", ["shop"]],
+      ["", ["api"]],
+    ])
+  })
+
+  test("a chart's component label groups by role", () => {
+    const db = service("db", { group: "primary", role: "data" })
+    const api = service("api", { group: "server" })
+    expect(names([api, db])).toStrictEqual([
+      ["worker", ["api"]],
+      ["data", ["db"]],
+    ])
   })
 })

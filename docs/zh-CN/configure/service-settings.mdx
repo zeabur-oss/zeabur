@@ -128,6 +128,21 @@ containers:
 
 服务的配置超出兼容范围（例如访问宿主机）时，这里会显示**不受限**，需要使用 YAML 修改。管理员把项目的安全级别（Pod Security）改为 `restricted` 时，只有严格的服务才能启动，见[调整 Pod Security 级别](./projects.mdx#调整-pod-security-级别)。
 
+## 在侧边栏给服务分组
+
+项目侧边栏默认按角色列出服务，例如网页服务和数据库。想改用你起的组名来分，到服务**设置** → **分组**，选一个现有的组或输入新名称。字段留空就是把服务移出分组。然后**检查变更**并应用，服务不会重启。
+
+只要有一个服务在某个组里，侧边栏就会按组名列出各组，其他服务列在**未分组**下。
+
+分组就是工作负载本身的 `zeabur.com/group` 标签，不是 Pod 模板上的标签。用 kubectl 或在 Git 里设置时，把标签加到工作负载的 `metadata.labels`：
+
+```sh
+kubectl -n demo label deployment/web zeabur.com/group=shop
+kubectl -n demo label deployment/web zeabur.com/group-
+```
+
+第二行命令会把服务移出分组。Helm chart 设置的 `app.kubernetes.io/component` 标签不算分组。
+
 ## 确认结果
 
 - **计算资源**和**健康检查**显示当前的值，**安全性**标明当前选择的是严格还是兼容。
