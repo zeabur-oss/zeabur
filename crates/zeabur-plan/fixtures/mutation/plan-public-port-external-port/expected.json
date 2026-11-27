@@ -1,0 +1,28 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "Service", "name": "web-public-8080"},
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "v1",
+          "kind": "Service",
+          "metadata": {
+            "name": "web-public-8080",
+            "namespace": "demo",
+            "labels": {"app.kubernetes.io/name": "web"}
+          },
+          "spec": {
+            "type": "LoadBalancer",
+            "selector": {"app": "web"},
+            "ports": [{"name": "http", "port": 12345, "targetPort": 8080, "protocol": "TCP"}]
+          }
+        }
+      }
+    }
+  ],
+  "impact": [{"kind": "Deployment", "name": "web"}],
+  "warnings": [
+    {"code": "publicPort", "workload": {"kind": "Deployment", "name": "web"}, "port": 12345, "health": "warn"}
+  ]
+}

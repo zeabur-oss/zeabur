@@ -105,6 +105,10 @@ export const rules = {
     maxLength: 63,
     pattern: "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
   },
+  "PublicPortChange.external": {
+    minimum: 1,
+    maximum: 65535,
+  },
   "S3DestinationFields.bucket": {
     pattern: "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$",
   },

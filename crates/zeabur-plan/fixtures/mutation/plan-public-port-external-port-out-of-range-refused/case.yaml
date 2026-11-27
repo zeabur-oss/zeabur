@@ -1,0 +1,10 @@
+description: "An external port above 65535 is refused."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: publicPort
+        workload: {kind: Deployment, name: web}
+        service: web
+        port: 8080
+        external: 70000

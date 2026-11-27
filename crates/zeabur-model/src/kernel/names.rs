@@ -172,6 +172,22 @@ pub fn is_system_namespace(namespace: &str) -> bool {
     namespace.starts_with("kube-")
 }
 
+/// The name of the `LoadBalancer` Service that opens port `port` of Service `service` to the
+/// internet.
+#[must_use]
+pub fn public_service_name(service: &str, port: i32) -> String {
+    format!("{service}-public-{port}")
+}
+
+/// The Service and port that a Service named by [`public_service_name`] opens; `None` for any
+/// other name.
+#[must_use]
+pub fn public_port_of(name: &str) -> Option<(&str, i32)> {
+    let (service, port) = name.rsplit_once("-public-")?;
+    let port = port.parse().ok().filter(|p| (1..=65535).contains(p))?;
+    (!service.is_empty() && public_service_name(service, port) == name).then_some((service, port))
+}
+
 /// A Gateway API `Gateway`, by namespace and name: one a new `HTTPRoute` can attach to.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct GatewayRef {
@@ -183,7 +199,26 @@ pub struct GatewayRef {
 
 #[cfg(test)]
 mod tests {
-    use super::is_system_namespace;
+    use super::{is_system_namespace, public_port_of, public_service_name};
+
+    #[test]
+    fn a_public_service_name_gives_back_the_service_and_port() {
+        for (service, port) in [("web", 8080), ("api-public-1", 443)] {
+            assert_eq!(
+                public_port_of(&public_service_name(service, port)),
+                Some((service, port))
+            );
+        }
+        for name in [
+            "web",
+            "web-public-",
+            "-public-80",
+            "web-public-080",
+            "web-public-0",
+        ] {
+            assert_eq!(public_port_of(name), None, "{name}");
+        }
+    }
 
     #[test]
     fn the_kube_prefix_is_kubernetes_own() {

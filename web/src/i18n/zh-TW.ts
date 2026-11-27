@@ -1751,6 +1751,8 @@ export const zhTW: Messages = {
   "confirm.envImport": (kind, name, service) =>
     `${service} 把 ${kind} ${name} 的每個鍵都當成變數讀取，副本會重新啟動。`,
   "confirm.publicPort": (port, name) => `把 ${name} 的連接埠 ${port} 開放到網際網路。`,
+  "confirm.publicPortExternal": (port, name, external) =>
+    `把 ${name} 的連接埠 ${port} 開放到網際網路，外部連接埠是 ${external}。`,
   "confirm.publicPortOff": (port, name) =>
     `關閉 ${name} 的連接埠 ${port}，叢集外的用戶端就連不到了。`,
   "confirm.envImportOff": (kind, name, service) =>
@@ -3915,7 +3917,9 @@ export const zhTW: Messages = {
   "ports.anyoneBody": "Zeabur 不會在前面加上密碼或 HTTPS，服務要自己檢查連線的是誰。",
   "ports.allOpen": "這個服務的連接埠都已經開放了。",
   "ports.port": "連接埠",
-  "ports.portHint": "每個節點的位址都會開放同一個連接埠號碼。",
+  "ports.external": "外部連接埠",
+  "ports.externalHint": "網際網路上的用戶端連這個連接埠。留空就用服務的連接埠。",
+  "ports.reaches": (port) => `連到連接埠 ${port}`,
   "ip.title": "IP 限制",
   "ip.about": "決定哪些 IP 能開啟這個服務的網域，以及這個服務能連到哪些 IP。",
   "ip.noLimit": "沒有限制",

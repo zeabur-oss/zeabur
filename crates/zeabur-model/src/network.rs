@@ -97,10 +97,25 @@ pub struct Endpoint {
     /// `status.loadBalancer.ingress`, an IP or a hostname each; empty while it has none.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub external_addresses: Vec<String>,
+    /// For a `LoadBalancer` Service with the name Zeabur gives a public port
+    /// (`<service>-public-<port>`): the Service port it opens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opens: Option<OpenedPort>,
     /// The tool that manages the Service, if any.
     pub provenance: Provenance,
     /// The Service object.
     pub origin: Origin,
+}
+
+/// The Service port that a public port opens.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct OpenedPort {
+    /// The Service.
+    pub service: String,
+    /// Its port.
+    pub port: i32,
 }
 
 /// An Ingress or a Gateway API `HTTPRoute` routing to workloads' Services: how they are reached

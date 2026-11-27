@@ -6,15 +6,12 @@ import { CopyButton } from "@/components/bits"
 import { GateTip, useGate } from "@/components/gate"
 import type { usePlanner } from "@/components/plan/planner"
 import { useT } from "@/i18n"
-import type { Endpoint, Service } from "@/model/service"
+import type { Endpoint, OpenedPort, Service } from "@/model/service"
 import { Badge } from "@zeabur-oss/design-system/components/badge"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
 
 const OpenPort = lazy(() => import("@/routes/service/open-port"))
-
-/** The `LoadBalancer` Service Zeabur makes for a port: `<service>-public-<port>`. */
-const made = /^(.+)-public-(\d+)$/
 
 /** The ports of a service that anyone on the internet can connect to: its `LoadBalancer`
  * Services. */
@@ -36,15 +33,12 @@ export function PublicPorts({
   const closed = endpoints.filter((e) => e.type !== "LoadBalancer" && e.clusterIP !== "None")
   const workload = { kind: service.kind, name: service.name }
   const managed = !!service.provenance.tool
-  const close = (name: string, port: number) => {
-    const from = made.exec(name)?.[1]
-    if (!from) return
+  const close = ({ service: from, port }: OpenedPort) =>
     plan({
       title: t("ports.closeTitle", port, service.name),
       service: workload,
       changes: [{ op: "publicPort", workload, service: from, port, remove: true }],
     })
-  }
   return (
     <section className="flex min-w-0 flex-col gap-3" aria-labelledby="net-ports">
       <SectionHeader
@@ -72,6 +66,7 @@ export function PublicPorts({
           {open.flatMap((e) =>
             e.ports.map((p) => {
               const addresses = e.externalAddresses ?? []
+              const opens = e.opens
               return (
                 <li
                   key={`${e.name}/${p.port}`}
@@ -95,16 +90,21 @@ export function PublicPorts({
                     <span className="type-meta text-muted-foreground" translate="no">
                       {p.protocol}
                     </span>
+                    {opens ? (
+                      <span className="type-meta text-muted-foreground">
+                        {t("ports.reaches", opens.port)}
+                      </span>
+                    ) : null}
                     {service.dataStore ? (
                       <Badge variant="fail">{t("ports.databaseOpen")}</Badge>
                     ) : null}
                   </span>
-                  {made.test(e.name) && !managed ? (
+                  {opens && !managed ? (
                     <GateTip gate={gate}>
                       <Button
                         variant="ghost"
                         size="xs"
-                        onClick={() => close(e.name, p.port)}
+                        onClick={() => close(opens)}
                         aria-label={t("ports.close", p.port)}
                       >
                         <XIcon aria-hidden="true" data-icon="inline-start" />

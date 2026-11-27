@@ -1008,6 +1008,27 @@ test("a domain waiting in the draft shows in the list, in the review, and goes w
   await expect(page.getByText("1 change pending")).toHaveCount(0)
 })
 
+test("a port opened on another external port lists that port and the port it reaches", async ({
+  page,
+}) => {
+  await page.goto(`${project}/services/Deployment/${healthy}?tab=networking`)
+  const ports = page
+    .getByRole("tabpanel", { name: "Networking" })
+    .getByRole("region", { name: "Public ports" })
+  await ports.getByRole("button", { name: "Open a port" }).click()
+  await page.getByRole("textbox", { name: "External port" }).fill("18045")
+  await page.getByRole("button", { name: "Review changes", exact: true }).click()
+  await confirmPlan(page, /^Open port \d+ of /, "Open port", "external port 18045")
+  const row = ports.getByRole("listitem").filter({ hasText: /to port \d+/ })
+  // Without a load balancer controller, the row waits for an address.
+  await expect(row).toContainText(/:18045|Port 18045 waits/, { timeout: 15_000 })
+  await row.getByRole("button", { name: "Close port 18045" }).click()
+  await confirmPlan(page, /^Close port \d+ of /, "Close port")
+  await expect(ports).toContainText("No port of this service is open to the internet.", {
+    timeout: 15_000,
+  })
+})
+
 test("Networking shows who may reach a service, and a ready-made policy isolates it", async ({
   page,
 }) => {

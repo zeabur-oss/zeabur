@@ -1,0 +1,10 @@
+description: "An external port that another LoadBalancer Service of the project already opens is refused; a port without a protocol is TCP."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: publicPort
+        workload: {kind: Deployment, name: web}
+        service: web
+        port: 8080
+        external: 12345

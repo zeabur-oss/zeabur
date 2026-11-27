@@ -1916,6 +1916,8 @@ export const en = {
     `${service} reads every key of ${kind} ${name} as variables. Its replicas restart.`,
   "confirm.publicPort": (port: number, name: string) =>
     `Open port ${port} of ${name} to the internet.`,
+  "confirm.publicPortExternal": (port: number, name: string, external: number) =>
+    `Open port ${port} of ${name} to the internet through external port ${external}.`,
   "confirm.publicPortOff": (port: number, name: string) =>
     `Close port ${port} of ${name}. Clients outside the cluster can no longer connect to it.`,
   "confirm.envImportOff": (kind: string, name: string, service: string) =>
@@ -4290,7 +4292,10 @@ export const en = {
     "Zeabur puts no password or HTTPS in front of it. The service must check who connects.",
   "ports.allOpen": "Every port of this service is already open.",
   "ports.port": "Port",
-  "ports.portHint": "The same port number opens on every node's address.",
+  "ports.external": "External port",
+  "ports.externalHint":
+    "Clients on the internet connect to this port. Leave it empty to use the service port.",
+  "ports.reaches": (port: number) => `to port ${port}`,
   "ip.title": "IP limits",
   "ip.about":
     "Choose which addresses can open this service's domains, and which addresses its replicas can connect to.",

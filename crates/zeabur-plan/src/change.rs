@@ -742,8 +742,13 @@ pub struct PublicPortChange {
     pub workload: WorkloadRef,
     /// The workload's Service that has the port.
     pub service: String,
-    /// The Service port. It is also the port on the internet.
+    /// The Service port.
     pub port: i32,
+    /// The port on the internet: the `port` of the `LoadBalancer` Service. Without it, the
+    /// Service port. A close ignores it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "openapi", schema(minimum = 1, maximum = 65535))]
+    pub external: Option<i32>,
     /// Close the port instead: delete the `LoadBalancer` Service that opened it.
     #[serde(default)]
     pub remove: bool,
@@ -1458,7 +1463,7 @@ pub enum Warning {
     PublicPort {
         /// The workload.
         workload: WorkloadRef,
-        /// The port.
+        /// The port on the internet.
         port: i32,
         /// What kind of data store the workload is, when it is one.
         #[serde(default, skip_serializing_if = "Option::is_none")]

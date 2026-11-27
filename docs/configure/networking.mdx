@@ -46,6 +46,8 @@ Use public ports to let clients outside the cluster connect to non-HTTP services
 
 Under **Public ports** in the service's **Networking** tab, click **Open a port**, then choose the port in **Port**. Only ports on private addresses are available.
 
+To let clients connect on another number, type it in **External port**, such as 12345 for a service on 8080. Leave it empty to use the same number.
+
 </Step>
 <Step>
 
@@ -58,7 +60,7 @@ Click **Review changes**, confirm the changes, and apply them.
 
 ### Get the address
 
-The list shows each node's address and port, such as `203.0.113.7:5432`, with a copy button next to it. If it shows **Port 5432 is waiting for the load balancer to assign an address.**, the load balancer is still processing the request, or another service is already using that port on the node.
+The list shows each node's address and port, such as `203.0.113.7:5432`, with a copy button next to it, followed by the port it reaches, such as **to port 5432**. If it shows **Port 5432 is waiting for the load balancer to assign an address.**, the load balancer is still processing the request, or another service is already using that port on the node.
 
 </Step>
 </Steps>
@@ -67,7 +69,7 @@ The list shows each node's address and port, such as `203.0.113.7:5432`, with a 
 Public ports have no password or HTTPS protection in front of them. Anyone on the internet can connect, so the service must authenticate incoming connections itself. When you expose a database, the interface labels it **Database open to the internet**. If only services in the project need to connect to the database, use a private address instead.
 </Callout>
 
-ServiceLB listens on the same port number on every node, so a port number can only be exposed once across the cluster. Zeabur OSS rejects the change if another service in the same project already exposes that port.
+ServiceLB listens on the external port on every node, so an external port can only be exposed once across the cluster. Zeabur OSS rejects the change if another service in the same project already exposes that external port.
 
 To close a port, click **Close** in its row, review the change, and apply it.
 
@@ -145,6 +147,19 @@ To close the port, delete this Service:
 
 ```sh
 kubectl -n demo delete service db-public-5432
+```
+
+With an external port, `port` is the external port and `targetPort` stays the one of the source port. The name still uses the source port. To expose port 8080 of `web` on 12345:
+
+```yaml
+metadata:
+  name: web-public-8080
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 12345
+      targetPort: 8080
+      protocol: TCP
 ```
 
 ### Connection rules

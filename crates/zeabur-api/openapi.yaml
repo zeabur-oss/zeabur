@@ -9521,6 +9521,13 @@ components:
         name:
           type: string
           description: The Service's name.
+        opens:
+          oneOf:
+          - $ref: "#/components/schemas/OpenedPort"
+            description: |-
+              For a `LoadBalancer` Service with the name Zeabur gives a public port
+              (`<service>-public-<port>`): the Service port it opens.
+          - type: "null"
         origin:
           $ref: "#/components/schemas/Origin"
           description: The Service object.
@@ -14036,6 +14043,20 @@ components:
           - string
           - "null"
           description: "`metadata.uid` after the write; absent for a deletion."
+    OpenedPort:
+      type: object
+      description: The Service port that a public port opens.
+      required:
+      - service
+      - port
+      properties:
+        port:
+          type: integer
+          format: int32
+          description: Its port.
+        service:
+          type: string
+          description: The Service.
     Origin:
       type: object
       description: |-
@@ -14958,7 +14979,7 @@ components:
           port:
             type: integer
             format: int32
-            description: The port.
+            description: The port on the internet.
           workload:
             $ref: "#/components/schemas/WorkloadRef"
             description: The workload.
@@ -16597,10 +16618,20 @@ components:
       - service
       - port
       properties:
+        external:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: |-
+            The port on the internet: the `port` of the `LoadBalancer` Service. Without it, the
+            Service port. A close ignores it.
+          maximum: 65535
+          minimum: 1
         port:
           type: integer
           format: int32
-          description: The Service port. It is also the port on the internet.
+          description: The Service port.
         remove:
           type: boolean
           description: "Close the port instead: delete the `LoadBalancer` Service that opened it."

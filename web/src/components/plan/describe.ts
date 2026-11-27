@@ -346,6 +346,14 @@ function accessSentence(t: Translate, change: AccessChange | ServiceChange): str
   }
 }
 
+/** What a `publicPort` change does, with the external port when it is another one. */
+function publicPortSentence(t: Translate, change: Extract<Change, { op: "publicPort" }>): string {
+  if (change.remove) return t("confirm.publicPortOff", change.port, change.workload.name)
+  if (change.external === undefined || change.external === null)
+    return t("confirm.publicPort", change.port, change.workload.name)
+  return t("confirm.publicPortExternal", change.port, change.workload.name, change.external)
+}
+
 /** The sentence of a Build's change, by its source. */
 const SET_BUILD = { git: "confirm.setBuild", upload: "confirm.setBuildUpload" } as const
 const CREATE_BUILT = {
@@ -360,9 +368,7 @@ function serviceSentence(t: Translate, change: ServiceChange): string {
         ? t("confirm.envImportOff", change.kind, change.name, change.workload.name)
         : t("confirm.envImport", change.kind, change.name, change.workload.name)
     case "publicPort":
-      return change.remove
-        ? t("confirm.publicPortOff", change.port, change.workload.name)
-        : t("confirm.publicPort", change.port, change.workload.name)
+      return publicPortSentence(t, change)
     case "buildOptions":
       return t("confirm.buildOptions", change.build)
     case "setBuild":

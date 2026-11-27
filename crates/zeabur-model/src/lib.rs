@@ -48,8 +48,8 @@ pub use image_updates::{
     KEEL_POLICY, KEEL_POLL, KEEL_POLL_SCHEDULE, KEEL_TRIGGER, UpdateSetting, UpdateWindow, Weekday,
 };
 pub use network::{
-    Endpoint, InferredFrom, Port, PortProtocol, ProtocolInference, Route, RouteMiddleware,
-    RouteRule, RouteTls,
+    Endpoint, InferredFrom, OpenedPort, Port, PortProtocol, ProtocolInference, Route,
+    RouteMiddleware, RouteRule, RouteTls,
 };
 pub use pod_security::{PodSecurityLevel, RunAs};
 pub use project::{
