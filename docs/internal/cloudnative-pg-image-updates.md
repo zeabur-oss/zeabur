@@ -68,5 +68,4 @@ The full development-cluster profile builds/enables the updater from this checko
 review/apply/reload/off, status churn, last-applied retention and real S3 backups. Its future
 schedule does not prove a registry-triggered rollout. Separately validate an old/new registry
 tag with three real PostgreSQL instances, unchanged PVCs/data, off/future controls and a write
-after switchover. Record source/image identity and stock Keel provenance for that run; earlier
-patched-Keel results do not validate this implementation.
+after the rollout. Record which Zeabur updater and stock Keel images ran.

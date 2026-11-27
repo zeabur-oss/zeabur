@@ -21,7 +21,7 @@ rules:
     verbs: [get, list, patch]
   - apiGroups: [""]
     resources: [nodes, pods]
-    verbs: [get, list]
+    verbs: [list]
   # Only the pull Secrets explicitly named by an opted-in database are read; never listed.
   - apiGroups: [""]
     resources: [secrets]

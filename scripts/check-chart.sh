@@ -457,7 +457,9 @@ expect database-updater "$out" 'select(.kind == "ConfigMap" and .metadata.name =
 expect database-updater "$out" 'select(.kind == "ClusterRoleBinding" and .metadata.name == "zeabur-database-updater") | .subjects[].name' zeabur-database-updater
 expect database-updater "$out" 'select(.kind == "Role" and .metadata.name == "zeabur-database-updater-reader") | .rules[] | [.apiGroups[], .resources[], .resourceNames[], .verbs[]] | join(",")' \
   apps,deployments,zeabur-database-updater,get
-expect database-updater "$out" '[select(.kind == "ClusterRole" and .metadata.name == "zeabur-database-updater") | .rules[] | select(.verbs[] == "patch") | .resources[]] | join(",")' clusters
+expect database-updater "$out" \
+  'select(.kind == "ClusterRole" and .metadata.name == "zeabur-database-updater") | [.rules[] | [.resources, .verbs] | map(sort | join(",")) | join("=")] | sort | join(" ")' \
+  'clusters=get,list,patch nodes,pods=list secrets=get'
 expect database-updater "$out" '[select(.kind == "ClusterRoleBinding") | .subjects[] | select(.kind == "ServiceAccount" and .name == "zeabur")] | length' 0
 expect database-updater-disabled "$(render -f "$chart/ci/minimal-values.yaml")" \
   '[select(.metadata.name == "zeabur-database-updater" or .metadata.name == "zeabur-database-updater-reader")] | length' 0
