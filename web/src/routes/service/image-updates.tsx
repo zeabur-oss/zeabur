@@ -68,7 +68,7 @@ export function ImageUpdatesSection({ project, service }: { project: string; ser
   )
 }
 
-export function KeelMissing({ install }: { install?: Schemas.ComponentRef }) {
+function KeelMissing({ install }: { install?: Schemas.ComponentRef }) {
   const t = useT()
   return install ? (
     <InstallAlert variant="info" text={t("imageUpdates.keelMissing")} components={[install]} />
@@ -159,7 +159,7 @@ export function PolicyField({
   )
 }
 
-/** When Keel looks: every hour, or a day and hour of the browser's, with the UTC time below. */
+/** When checks run: every hour, or a day and hour of the browser's, with the UTC time below. */
 export function WhenFields({
   form,
   now,

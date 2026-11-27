@@ -739,7 +739,7 @@ export const zhTW: Messages = {
   "db.imageUpdates.updater.forbidden":
     "你的帳號無法檢視資料庫更新程式。請向叢集管理員申請存取權限。",
   "db.imageUpdates.unavailable":
-    "請使用明確的 PostgreSQL 主版本標籤（例如 18-standard-trixie），且不要設定 imageCatalogRef。標籤即使附有摘要，也能更新。",
+    "請使用 PostgreSQL 主版本標籤（例如 18-standard-trixie），且不要使用映像目錄或設定核准條件。標籤即使附有摘要，也能更新。",
   "imageUpdates.hint": "讓服務自動換上映像檔的新版本。每次更新都會重新啟動服務。",
   "imageUpdates.versions": "更新哪些版本",
   "imageUpdates.policy.other": (policy) => `Zeabur 以外的設定：${policy}`,
@@ -770,8 +770,8 @@ export const zhTW: Messages = {
   "imageUpdates.when.weekly": "每週一次",
   "imageUpdates.day": "星期",
   "imageUpdates.hour": "時間",
-  "imageUpdates.hourlyHint": "Keel 每小時檢查一次。",
-  "imageUpdates.utc": (when) => `依你的時區選擇。Keel 會在${when}檢查。`,
+  "imageUpdates.hourlyHint": "每小時檢查一次新映像檔。",
+  "imageUpdates.utc": (when) => `依你的時區選擇，會在${when}檢查。`,
   "imageUpdates.window.weekly": (day, time) => `每${weekdayZhTW[day]} ${time}（UTC）`,
   "imageUpdates.window.daily": (time) => `每天 ${time}（UTC）`,
   "imageUpdates.keelMissing": "自動更新需要叢集裡的 Keel 元件，目前還沒有安裝。",

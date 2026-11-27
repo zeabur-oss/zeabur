@@ -133,7 +133,15 @@ func credentials(ctx context.Context, core coreclient.CoreV1Interface, selected 
 				Auth     string `json:"auth"`
 			} `json:"auths"`
 		}
-		if err := json.Unmarshal(secret.Data[corev1.DockerConfigJsonKey], &config); err != nil {
+		switch secret.Type {
+		case corev1.SecretTypeDockerConfigJson:
+			err = json.Unmarshal(secret.Data[corev1.DockerConfigJsonKey], &config)
+		case corev1.SecretTypeDockercfg:
+			err = json.Unmarshal(secret.Data[corev1.DockerConfigKey], &config.Auths)
+		default:
+			return "", "", fmt.Errorf("unsupported image pull secret type in %s", reference.Name)
+		}
+		if err != nil {
 			return "", "", fmt.Errorf("invalid image pull secret %s", reference.Name)
 		}
 		for address, auth := range config.Auths {

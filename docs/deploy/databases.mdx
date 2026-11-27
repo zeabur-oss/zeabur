@@ -85,7 +85,7 @@ An administrator must enable `databaseUpdater.enabled: true` in the Zeabur Helm 
 
 For a directly managed CloudNativePG database, open **Settings** → **Automatic updates**, choose **New image under the same tag** and a schedule, then review and apply. Use a major-version rolling tag such as `17-standard-trixie`. The updater keeps that repository and tag and replaces its digest when the registry changes it. It does not select another PostgreSQL major, image flavor or catalog entry.
 
-Times are UTC. The schedule controls when checks begin, and CloudNativePG performs the rollout afterwards. Restarting the updater waits for the next check. Keep working backups and monitor database readiness; a failed rollout is not automatically rolled back. Select **Off** to stop future checks, including when the updater is unavailable. Turning it off does not undo an update already applied.
+Choose a time in your time zone; the fields show the saved schedule in UTC. The schedule controls when checks begin, and CloudNativePG performs the rollout afterwards. Restarting the updater waits for the next check. Keep working backups and monitor database readiness; a failed rollout is not automatically rolled back. Select **Off** to stop future checks, including when the updater is unavailable. Turning it off does not undo an update already applied.
 
 ## Set up S3 backups
 
