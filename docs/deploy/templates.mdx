@@ -70,9 +70,10 @@ A coding agent such as Claude Code or Codex can deploy a template for you with `
 
 ```text
 Deploy the Zeabur Catalog template <template> into the project <project> on my cluster. Follow https://oss.zeabur.com/docs/zeabur/deploy/templates.md.
+Ask me which kubeconfig context to use, and pass it with --context to kubectl, `zeaburctl templates export` and `zeaburctl doctor`. Use a zeaburctl of the same version as my Zeabur OSS.
 Deploy only what `zeaburctl templates export <template> --project <project>` prints. Don't choose versions or values, and don't write your own manifests, Compose files or Helm commands.
-Ask me for the value of every <name> placeholder in the output. Then export again with --domain, --cluster-issuer and --set <name>=<value>, save that output to one file, and use only that file.
-If zeaburctl says the cluster lacks a component, ask me which --format fits my cluster, and install the component with what `zeaburctl components export <component> --format <format>` prints.
+Ask me for the value of every <name> placeholder in the output. Export again with <domain> as --domain, <clusterIssuer> as --cluster-issuer and each other placeholder as --set <name>=<value>. Save that output to one file and use only that file for the template.
+If zeaburctl says the cluster lacks a component, ask me which --format fits my cluster: helmchart, flux or argocd. Save what `zeaburctl components export <component> --format <format>` prints to its own file and install it first.
 Before each write to the cluster, show me the output of `kubectl diff --server-side -f <file>` and wait for my go-ahead. Then run `kubectl apply --server-side -f <file>` on the same file.
 When you finish, run `zeaburctl doctor --output json` and report what it says.
 ```
@@ -94,7 +95,7 @@ kubectl apply --server-side -f miniflux.yaml
 ```
 
 - The output starts with the secrets that hold the template's passwords and keys. Each run generates new values, so export once and apply that file. Applying a later export again replaces the passwords of a running application. Don't put the file in version control.
-- Give each field the template asks for with `--set <name>=<value>`, such as `--set adminEmail=me@example.com`. Field names are under `inputs` in the template's `template.yaml`. A required field you don't give, a missing `--domain`, and a missing `--cluster-issuer` appear as `<name>` placeholders. Replace them before you apply. `--cluster-issuer` is the issuer the cluster administrator set for Zeabur OSS (`domains.clusterIssuer`).
+- Give each field the template asks for with `--set <name>=<value>`, such as `--set adminEmail=me@example.com`. Field names are under `inputs` in the template's `template.yaml`. A required field you don't give, a missing `--domain`, and a missing `--cluster-issuer` appear as `<name>` placeholders. Give their values with these options and export again before you apply. `--cluster-issuer` is the issuer the cluster administrator set for Zeabur OSS (`domains.clusterIssuer`).
 - If the cluster lacks a component the template needs, the command says so and names the `zeaburctl components export` command that installs it. See [zeaburctl](../reference/zeaburctl.mdx#templates-export).
 
 Delete the entire template:

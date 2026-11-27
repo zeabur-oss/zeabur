@@ -227,7 +227,7 @@ Prints, as YAML for `kubectl diff --server-side` and `kubectl apply --server-sid
 | `--context` | The kubeconfig context for the component check. Defaults to the current one |
 
 - The output starts with a secret for the template's passwords and keys. Each run generates new values, so save one export and apply that file.
-- A required field you don't give, a missing domain, and a missing issuer appear as `<name>` placeholders. Replace them before you apply.
+- A required field you don't give, a missing domain, and a missing issuer appear as `<name>` placeholders. Give their values with the options above and export again before you apply.
 - An unknown template ID, a value that doesn't match its field's format, and a value for a generated field stop the command.
 - If the cluster lacks a component the template needs, the command says so on stderr and names the `zeaburctl components export` command that installs it. If the cluster can't be reached, it says the components weren't checked and prints the objects anyway.
 
