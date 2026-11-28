@@ -185,91 +185,95 @@ function settingSentence(
   )
 }
 
+type SentenceOf<Op extends Change["op"]> = (
+  t: Translate,
+  change: Extract<Change, { op: Op }>,
+  podsOf: PodsOf,
+  plan?: Pick<Plan, "objects" | "preview">,
+) => string
+
+const listOf = (t: Translate, items: string[]) => (items.length > 0 ? t("common.list", items) : "")
+
+/** The sentence of each kind of change, but the access ones. */
+const sentences: { [Op in Change["op"]]?: SentenceOf<Op> } = {
+  restart: (t, c, podsOf) => rolling(t, c.workload, podsOf, true),
+  env: (t, c, _, plan) => {
+    const fields = fieldsOf(plan, c.workload.kind, c.workload.name)
+    const [removed, added, changed] = sorted(
+      c.changes,
+      (e) => e.name,
+      (name) => isNew(fields, (path) => path.includes(`.env[name=${name}]`)),
+    )
+    const list = (items: string[]) => listOf(t, items)
+    return t("confirm.env", list(removed), list(added), list(changed), c.workload.name)
+  },
+  data: (t, c, _, plan) => {
+    const fields = fieldsOf(plan, c.kind, c.name)
+    const [removed, added, changed] = sorted(
+      c.changes,
+      (e) => e.key,
+      (key) =>
+        isNew(fields, (path) => below(path, `data.${key}`) || below(path, `stringData.${key}`)),
+    )
+    const list = (items: string[]) => listOf(t, items)
+    return t("confirm.data", list(removed), list(added), list(changed), c.kind, c.name)
+  },
+  addDomain: (t, c) => t("confirm.addDomain", c.hostname, c.workload.name),
+  renameDomain: (t, c) => t("confirm.renameDomain", c.from),
+  removeDomain: (t, c) => t("confirm.removeDomain", c.hostname),
+  rollback: (t, c) => t("confirm.rollback", c.revision),
+  addVolume: volumeSentence,
+  removeVolume: volumeSentence,
+  swapClaim: volumeSentence,
+  editMount: volumeSentence,
+  probe: (t, c) => probeSentence(t, c.probe, c.set ?? undefined),
+  configReload: settingSentence,
+  securityProfile: settingSentence,
+  port: settingSentence,
+  image: (t, c) => t("confirm.image", c.workload.name, imageTag(c.image)),
+  rebuild: (t, c) => t("confirm.rebuild", c.build),
+  autoUpdate: (t, c) => autoUpdateSentence(t, c.workload.name, c.update),
+  group: (t, c) =>
+    c.group ? t("confirm.group", c.workload.name, c.group) : t("confirm.ungroup", c.workload.name),
+  scale: (t, c, podsOf) => {
+    if (c.replicas === 0) return t("confirm.scaleZero", c.workload.name)
+    const from = podsOf(c.workload)?.desired
+    return from === undefined
+      ? t("confirm.scaleTo", c.workload.name, c.replicas)
+      : t("confirm.scale", c.workload.name, from, c.replicas)
+  },
+  resources: (t, c, _, plan) =>
+    resourcesSentence(
+      t,
+      c.requests ?? undefined,
+      c.limits ?? undefined,
+      fieldsOf(plan, c.workload.kind, c.workload.name),
+    ),
+  create: (t, c) => {
+    const object = (c.object ?? {}) as { kind?: unknown; metadata?: { name?: unknown } }
+    const kind = typeof object.kind === "string" ? object.kind : ""
+    const name = typeof object.metadata?.name === "string" ? object.metadata.name : ""
+    return t("confirm.create", kind, name)
+  },
+  delete: (t, c, _, plan) =>
+    plan?.preview?.deletedDatabases.includes(c.name)
+      ? t("confirm.deleteDatabase", c.name)
+      : t("confirm.delete", c.name),
+  debugContainer: (t, c) => t("confirm.debugContainer", c.pod),
+}
+
 function sentenceOf(
   t: Translate,
   change: Change,
   podsOf: PodsOf,
   plan?: Pick<Plan, "objects" | "preview">,
 ): string {
-  const list = (items: string[]) => (items.length > 0 ? t("common.list", items) : "")
   const plain = plainSentence[change.op]
   if (plain) return t(plain)
-  switch (change.op) {
-    case "restart":
-      return rolling(t, change.workload, podsOf, true)
-    case "env": {
-      const fields = fieldsOf(plan, change.workload.kind, change.workload.name)
-      const [removed, added, changed] = sorted(
-        change.changes,
-        (e) => e.name,
-        (name) => isNew(fields, (path) => path.includes(`.env[name=${name}]`)),
-      )
-      return t("confirm.env", list(removed), list(added), list(changed), change.workload.name)
-    }
-    case "data": {
-      const fields = fieldsOf(plan, change.kind, change.name)
-      const [removed, added, changed] = sorted(
-        change.changes,
-        (e) => e.key,
-        (key) =>
-          isNew(fields, (path) => below(path, `data.${key}`) || below(path, `stringData.${key}`)),
-      )
-      return t("confirm.data", list(removed), list(added), list(changed), change.kind, change.name)
-    }
-    case "addDomain":
-      return t("confirm.addDomain", change.hostname, change.workload.name)
-    case "renameDomain":
-      return t("confirm.renameDomain", change.from)
-    case "removeDomain":
-      return t("confirm.removeDomain", change.hostname)
-    case "rollback":
-      return t("confirm.rollback", change.revision)
-    case "addVolume":
-    case "removeVolume":
-    case "swapClaim":
-    case "editMount":
-      return volumeSentence(t, change)
-    case "probe":
-      return probeSentence(t, change.probe, change.set ?? undefined)
-    case "configReload":
-    case "securityProfile":
-    case "port":
-      return settingSentence(t, change)
-    case "image":
-      return t("confirm.image", change.workload.name, imageTag(change.image))
-    case "rebuild":
-      return t("confirm.rebuild", change.build)
-    case "autoUpdate":
-      return autoUpdateSentence(t, change.workload.name, change.update)
-    case "scale": {
-      if (change.replicas === 0) return t("confirm.scaleZero", change.workload.name)
-      const from = podsOf(change.workload)?.desired
-      return from === undefined
-        ? t("confirm.scaleTo", change.workload.name, change.replicas)
-        : t("confirm.scale", change.workload.name, from, change.replicas)
-    }
-    case "resources":
-      return resourcesSentence(
-        t,
-        change.requests ?? undefined,
-        change.limits ?? undefined,
-        fieldsOf(plan, change.workload.kind, change.workload.name),
-      )
-    case "create": {
-      const object = (change.object ?? {}) as { kind?: unknown; metadata?: { name?: unknown } }
-      const kind = typeof object.kind === "string" ? object.kind : ""
-      const name = typeof object.metadata?.name === "string" ? object.metadata.name : ""
-      return t("confirm.create", kind, name)
-    }
-    case "delete":
-      return plan?.preview?.deletedDatabases.includes(change.name)
-        ? t("confirm.deleteDatabase", change.name)
-        : t("confirm.delete", change.name)
-    case "debugContainer":
-      return t("confirm.debugContainer", change.pod)
-    default:
-      return accessSentence(t, change as Parameters<typeof accessSentence>[1])
-  }
+  const sentence = sentences[change.op] as SentenceOf<Change["op"]> | undefined
+  return sentence
+    ? sentence(t, change, podsOf, plan)
+    : accessSentence(t, change as Parameters<typeof accessSentence>[1])
 }
 
 type ServiceChange =
@@ -889,6 +893,7 @@ const plainAction: Partial<Record<Change["op"], PlainKey>> = {
   forceDeleteProject: "action.forceDeleteProject",
   details: "action.saveDetails",
   buildLimits: "action.saveBuildLimits",
+  group: "action.saveGroup",
   debugContainer: "action.openDebugTerminal",
   clusterTools: "action.openToolsTerminal",
 }

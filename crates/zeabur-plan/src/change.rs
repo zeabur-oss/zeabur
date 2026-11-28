@@ -295,6 +295,16 @@ pub enum Change {
         /// Which updates, if any.
         update: Update,
     },
+    /// Put a workload in a group, or take it out, by its group label (`zeabur.com/group`). The
+    /// label is on the workload, not its pod template, so nothing restarts.
+    #[serde(rename_all = "camelCase")]
+    Group {
+        /// The workload.
+        workload: WorkloadRef,
+        /// The group; absent takes the workload out of its group.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        group: Option<String>,
+    },
     /// Run this many pods of a Deployment or StatefulSet.
     #[serde(rename_all = "camelCase")]
     Scale {

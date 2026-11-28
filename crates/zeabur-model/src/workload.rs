@@ -234,6 +234,10 @@ pub struct ManagedBy {
 pub struct Classification {
     /// The group the workload is listed in.
     pub group: String,
+    /// Whether `group` comes from the group label (`zeabur.com/group`). Else it comes from the
+    /// chart's component label, the database or operator the workload runs for, or is `default`.
+    #[serde(default)]
+    pub grouped: bool,
     /// The name to show instead of the workload's, when it stands for something a person named,
     /// such as the database cluster whose data it holds.
     #[serde(default, skip_serializing_if = "Option::is_none")]

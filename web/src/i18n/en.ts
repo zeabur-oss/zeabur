@@ -556,6 +556,7 @@ export const en = {
   "project.services": "Services",
   "project.events": "Events",
   "project.noServices": "No services yet",
+  "project.ungrouped": "Ungrouped",
   "project.seeObjects": "View all objects",
   "project.healthyOf": (healthy: number, total: number) => `${healthy}/${total} healthy`,
   "project.deleting": "Deleting…",
@@ -1368,6 +1369,7 @@ export const en = {
   "action.openDebugTerminal": "Open debug terminal",
   "action.openToolsTerminal": "Open kubectl terminal",
   "action.saveDetails": "Save details",
+  "action.saveGroup": "Save groups",
   "action.saveBuildLimits": "Save build limits",
   "title.adopt": (ns: string) => `Use the existing namespace ${ns}`,
   "title.unadopt": (ns: string) => `Stop showing ${ns} as a project`,
@@ -1855,6 +1857,9 @@ export const en = {
     `Zeabur Builder builds ${build} from the folder you uploaded.`,
   "confirm.autoUpdateOn": (service: string) =>
     `Each new build of ${service} will go live as soon as it finishes.`,
+  "confirm.group": (service: string, group: string) =>
+    `${service} moves to the ${group} group in the sidebar. Nothing restarts.`,
+  "confirm.ungroup": (service: string) => `${service} leaves its group. Nothing restarts.`,
   "confirm.autoUpdateOff": (service: string) =>
     `${service} no longer updates on its own. You deploy each new version yourself.`,
   "confirm.imageUpdates": (service: string, policy: ImagePolicyKey, when?: string) =>
@@ -4067,6 +4072,23 @@ export const en = {
   "part.build": "Build",
   "part.health-checks": "Health checks",
   "part.security": "Security",
+  "group.edit": "Group services",
+  "group.hint":
+    "The sidebar lists the services of one group together. Drag a service to another group to move it.",
+  "group.new": "New group",
+  "group.add": "Add",
+  "group.name": "Group name",
+  "group.placeholder": "e.g. shop",
+  "group.empty": "Drag a service here. A group with no services is gone once you save.",
+  "group.dragHint":
+    "Press Space or Enter to pick up a service, the arrow keys to move it to another group, Space or Enter again to drop it, and Escape to cancel.",
+  "group.pickedUp": (service: string) => `Picked up ${service}.`,
+  "group.over": (service: string, group: string) => `Drop to move ${service} to ${group}.`,
+  "group.notOver": (service: string) => `${service} is not over a group.`,
+  "group.dropped": (service: string, group: string) => `Moved ${service} to ${group}.`,
+  "group.stays": (service: string) => `${service} stays where it was.`,
+  "group.invalid":
+    "Use at most 63 characters: a–z, A–Z, 0–9, -, _ or ., starting and ending with a letter or digit.",
   "part.updates": "Automatic updates",
   "part.tasks": "Scheduled tasks",
   "part.schedule": "Schedule",

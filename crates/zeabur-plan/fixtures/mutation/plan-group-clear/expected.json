@@ -1,0 +1,15 @@
+{
+  "objects": [
+    {
+      "write": {
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "41"},
+          {"op": "test", "path": "/metadata/labels/zeabur.com~1group", "value": "shop"},
+          {"op": "remove", "path": "/metadata/labels/zeabur.com~1group"}
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

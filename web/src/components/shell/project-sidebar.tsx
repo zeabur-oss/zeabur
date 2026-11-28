@@ -15,6 +15,7 @@ import { databasesQuery, objectStorageQuery, projectQuery } from "@/api/queries"
 import { AddMenu } from "@/components/add/menu"
 import { RoleIcon, ServiceIcon } from "@/components/service-icon"
 import { DockToggle } from "@/components/shell/dock-slot"
+import { GroupButton } from "@/components/shell/service-groups"
 import { ContextMenu } from "@/components/shell/user-menu"
 import { ProjectGlyph } from "@/components/shell/project-glyph"
 import { SearchRow } from "@/components/shell/search-row"
@@ -179,7 +180,10 @@ function ProjectNav({ project }: { project: string }) {
       <SearchRow />
       <SidebarContent>
         <SidebarGroup>{pages.map(pageRow)}</SidebarGroup>
-        <SidebarSection title={t("column.label")} action={<AddMenu project={project} compact />}>
+        <SidebarSection
+          title={t("column.label")}
+          action={<ServicesActions project={project} data={data} />}
+        >
           {data ? (
             <Services project={project} data={data} />
           ) : view.isPending ? (
@@ -218,6 +222,17 @@ function ProjectNav({ project }: { project: string }) {
   )
 }
 
+function ServicesActions({ project, data }: { project: string; data?: Project }) {
+  return (
+    <>
+      {data && data.services.length > 0 ? (
+        <GroupButton project={project} services={data.services} />
+      ) : null}
+      <AddMenu project={project} compact />
+    </>
+  )
+}
+
 function Services({ project, data }: { project: string; data: Project }) {
   const t = useT()
   const place = usePlace()
@@ -233,7 +248,8 @@ function Services({ project, data }: { project: string; data: Project }) {
       current={!place.entry && place.service === serviceId(service)}
     />
   )
-  if (groups.length === 1) return <>{groups[0]?.services.map((s) => row(s, false))}</>
+  if (groups.length === 1 && groups[0]?.role)
+    return <>{groups[0].services.map((s) => row(s, false))}</>
   const many = data.services.length > OPEN_ALL
   return (
     <>
@@ -245,8 +261,10 @@ function Services({ project, data }: { project: string; data: Project }) {
           <Tooltip content={roleKube[group.role]}>
             <span>{t(`role.${group.role}`)}</span>
           </Tooltip>
-        ) : (
+        ) : group.name ? (
           <span translate="no">{group.name}</span>
+        ) : (
+          <span>{t("project.ungrouped")}</span>
         )
         return (
           <SidebarMenu

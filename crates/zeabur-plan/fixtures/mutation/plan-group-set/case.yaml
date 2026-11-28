@@ -1,0 +1,3 @@
+description: "Putting a workload in a group sets the group label on the workload, not its pod template."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "group", "workload": {"kind": "Deployment", "name": "web"}, "group": "shop"}]}}

@@ -128,6 +128,28 @@ Selecting an option opens the review screen directly. Review and apply the chang
 
 If a service has settings beyond what Compatible permits, such as host access, this section shows **Unrestricted**. Use YAML to change those settings. If an administrator sets the project's security level (Pod Security) to `restricted`, only Strict services can start. See [Adjust the Pod Security level](./projects.mdx#change-the-pod-security-level).
 
+## Group services in the sidebar
+
+The project sidebar lists services by role, such as web services and databases. To list them by groups you name instead:
+
+1. In the project sidebar, select the **Group services** button next to **Services**.
+2. Drag each service into a group. The services in no group are under **Ungrouped**, at the end. With the keyboard, focus a service, press Space to pick it up, use the arrow keys to move it to another group and press Space to drop it.
+3. To make a group, select **New group**, type its name and select **Add**. Then drag services into it.
+4. Select **Review changes** and apply. Nothing restarts.
+
+The groups are listed by name. A group with no services is not kept: a group is only a label value on its services.
+
+When at least one service is in a group, the sidebar lists each group under its name and the other services under **Ungrouped**.
+
+The group is the `zeabur.com/group` label on the workload itself, not on its Pod template. To set it with kubectl or in Git, add the label to the workload's `metadata.labels`:
+
+```sh
+kubectl -n demo label deployment/web zeabur.com/group=shop
+kubectl -n demo label deployment/web zeabur.com/group-
+```
+
+The second command takes the service out of its group. The `app.kubernetes.io/component` label that Helm charts set doesn't make a group.
+
 ## Verify the result
 
 - **Compute** and **Health checks** show the current values. **Security** shows whether Strict or Compatible is selected.

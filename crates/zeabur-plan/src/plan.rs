@@ -476,6 +476,7 @@ impl<'a> Planner<'a> {
             Change::ArchiveDigest { build, digest } => self.archive_digest(build, digest),
             Change::BuildOptions(change) => self.build_options(change),
             Change::AutoUpdate { workload, update } => self.auto_update(workload, update),
+            Change::Group { workload, group } => self.group(workload, group.as_deref()),
             Change::Scale { workload, replicas } => self.scale(workload, *replicas),
             Change::ConfigReload { workload, enabled } => self.config_reload(workload, *enabled),
             Change::SecurityProfile { workload, profile } => {

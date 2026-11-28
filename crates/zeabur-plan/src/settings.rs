@@ -401,6 +401,52 @@ impl<'a> Planner<'a> {
         }
     }
 
+    pub(crate) fn group(
+        &mut self,
+        reference: &WorkloadRef,
+        group: Option<&str>,
+    ) -> Result<(), PlanError> {
+        if let Some(group) = group
+            && !label_value(group)
+        {
+            return Err(error(
+                ErrorKind::Invalid,
+                "group_invalid",
+                format!(
+                    "{group:?} cannot name a group: use at most 63 letters, digits, '-', '_' or \
+                     '.', starting and ending with a letter or digit."
+                ),
+            ));
+        }
+        let found = self.editable_workload(reference)?;
+        let index = self.working(workload_target(found), workload_json(found)?);
+        let key = self.conventions.group_label.clone();
+        let current = self.current(index);
+        let path = pointer(&["metadata", "labels", &key]);
+        let before = current.pointer(&path).cloned();
+        let operations = match (before, group) {
+            (Some(before), Some(group)) if before.as_str() == Some(group) => vec![],
+            (Some(before), Some(group)) => vec![test(&path, before), replace(&path, json!(group))],
+            (None, Some(group)) => set_key(&current, "labels", &key, group),
+            (Some(before), None) => vec![test(&path, before), remove(&path)],
+            (None, None) => vec![],
+        };
+        if operations.is_empty() {
+            let place = if group.is_some() {
+                "in this group already"
+            } else {
+                "in no group"
+            };
+            return Err(error(
+                ErrorKind::BadRequest,
+                "unchanged",
+                format!("{} {} is {place}.", reference.kind.as_str(), reference.name),
+            ));
+        }
+        self.claim(index, &steps("labels", &key), &shown("labels", &key))?;
+        self.patch(index, operations)
+    }
+
     #[expect(clippy::too_many_lines, reason = "one change kind, read top to bottom")]
     pub(crate) fn add_volume(
         &mut self,
@@ -1097,4 +1143,17 @@ fn spec_of(container_pointer: &str) -> String {
     container_pointer
         .rsplit_once("/containers/")
         .map_or_else(String::new, |(spec, _)| spec.to_owned())
+}
+
+/// A label value Kubernetes accepts, not empty ([labels and selectors]).
+///
+/// [labels and selectors]: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
+fn label_value(value: &str) -> bool {
+    let alphanumeric = |c: char| c.is_ascii_alphanumeric();
+    value.len() <= 63
+        && value.starts_with(alphanumeric)
+        && value.ends_with(alphanumeric)
+        && value
+            .chars()
+            .all(|c| alphanumeric(c) || matches!(c, '-' | '_' | '.'))
 }

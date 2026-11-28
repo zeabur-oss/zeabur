@@ -266,20 +266,24 @@ export interface ServiceGroup {
   services: Service[]
 }
 
-/** By `app.kubernetes.io/part-of` when the project uses more than one group, else by role. */
+/**
+ * By the group label (`zeabur.com/group`) when a service has one, with the rest under a group
+ * with no name; else by role.
+ */
 export function groupServices(services: Service[]): ServiceGroup[] {
-  const named = new Set(services.map((s) => s.group).filter((g) => g && g !== "default"))
-  if (named.size > 1) {
+  if (services.some((s) => s.grouped)) {
     const groups = new Map<string, Service[]>()
     for (const service of services) {
-      const key = service.group || "default"
+      const key = service.grouped ? service.group : ""
       groups.set(key, [...(groups.get(key) ?? []), service])
     }
-    return [...groups.entries()].map(([key, list]) => ({
-      key,
-      name: key,
-      services: list.toSorted((a, b) => a.name.localeCompare(b.name)),
-    }))
+    return [...groups.entries()]
+      .toSorted(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)))
+      .map(([key, list]) => ({
+        key,
+        ...(key ? { name: key } : {}),
+        services: list.toSorted((a, b) => a.name.localeCompare(b.name)),
+      }))
   }
   return roles
     .map((role) => ({

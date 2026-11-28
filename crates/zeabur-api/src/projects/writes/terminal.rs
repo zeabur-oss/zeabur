@@ -109,6 +109,7 @@ pub(crate) async fn compute(
         | Change::ArchiveDigest { .. }
         | Change::BuildOptions(_)
         | Change::AutoUpdate { .. }
+        | Change::Group { .. }
         | Change::Scale { .. }
         | Change::ConfigReload { .. }
         | Change::SecurityProfile { .. }

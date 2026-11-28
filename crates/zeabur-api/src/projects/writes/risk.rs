@@ -212,6 +212,7 @@ fn weigh_one(change: &Change, ready: &ReadyPods) -> Weight {
         | Change::ArchiveDigest { .. }
         | Change::BuildOptions(_)
         | Change::AutoUpdate { .. }
+        | Change::Group { .. }
         | Change::Resources { .. }
         | Change::SecurityProfile { .. }
         | Change::Edit { .. }
