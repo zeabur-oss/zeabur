@@ -165,7 +165,6 @@ function usePlan(
           plan={plan.data}
           skipped={ask.skipped}
           notes={ask.notes}
-          warned={ask.warnings}
           description={description}
           alerted={!grouped && !description.risk && level === "high"}
         />
@@ -446,37 +445,16 @@ function alertVariant(warnings: Schemas.PlanWarning[]): "destructive" | "warn" {
   return warnings.some((w) => w.code === "publicPort" && w.dataStore) ? "destructive" : "warn"
 }
 
-/** The form's warnings, then the plan's, its gaps and what tools manage. */
-export function warningsOf(
-  t: Translate,
-  plan: Schemas.PlanResponse,
-  skipped: Skipped[] | undefined,
-  warned: string[] | undefined,
-): Said[] {
-  return [
-    ...(warned ?? []).map((text) => ({ text })),
-    ...warningsSaid(t, plan.warnings),
-    ...(plan.gaps ?? []).flatMap((gap) => {
-      const text = writeSentence(t, gap.message)
-      return text ? [{ text }] : []
-    }),
-    ...toolNotes(plan, skipped).map((note) => noteText(t, note)),
-  ]
-}
-
 function PlanBody({
   plan,
   skipped,
   notes = [],
-  warned,
   description,
   alerted,
 }: {
   plan: Schemas.PlanResponse
   skipped?: Skipped[]
   notes?: string[]
-  /** The form's own warnings, before the plan's. */
-  warned?: string[]
   description: Description
   /** The first line goes in a warning callout with the consequence. */
   alerted: boolean
@@ -484,7 +462,14 @@ function PlanBody({
   const t = useT()
   const { lines, more } = description
   const [first, ...rest] = lines
-  const warnings = warningsOf(t, plan, skipped, warned)
+  const warnings: Said[] = [
+    ...warningsSaid(t, plan.warnings),
+    ...(plan.gaps ?? []).flatMap((gap) => {
+      const text = writeSentence(t, gap.message)
+      return text ? [{ text }] : []
+    }),
+    ...toolNotes(plan, skipped).map((note) => noteText(t, note)),
+  ]
   const grouped = !!description.facts
   const described = (
     <>

@@ -25,8 +25,6 @@ export interface PlanAsk {
   skipped?: Skipped[]
   /** Sentences the changes cannot say themselves. */
   notes?: string[]
-  /** Warnings the form found that the plan cannot see, such as a cluster without room. */
-  warnings?: string[]
   /** A form's own words when its changes are only the means (`Asked.summary`). */
   summary?: { lines: string[]; action: string }
   /** No toast once applied: what follows (a terminal opening) shows it. */
