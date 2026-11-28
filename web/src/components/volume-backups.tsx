@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query"
-import { Link } from "@tanstack/react-router"
 import { useState } from "react"
 import ArchiveIcon from "~icons/ph/archive"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
@@ -16,6 +15,7 @@ import { FrequencyField, S3Fields } from "@/components/s3-fields"
 import { Schedule } from "@/components/schedule"
 import { VolumeRestore } from "@/components/volume-restore"
 import { type Translate, useT } from "@/i18n"
+import { useOpenComponent } from "@/components/component-installs"
 import {
   backUpVolumeNow,
   backupUser,
@@ -61,6 +61,7 @@ export function VolumeBackups({
   /** Each claim's mount, for a new volume like it. */
   mounts?: Record<string, Schemas.Mount>
 }) {
+  const open = useOpenComponent()
   const t = useT()
   const data = useBackups(project).data
   if (!data || claims.length === 0) return null
@@ -95,13 +96,13 @@ export function VolumeBackups({
           {k8up ? (
             <>
               {t("common.gap")}
-              <Link
-                to="/cluster/components"
-                search={{ component: k8up.id }}
+              <button
+                type="button"
+                onClick={() => open(k8up.id)}
                 className="text-foreground hover:underline"
               >
                 {t("backups.volume.openK8up")}
-              </Link>
+              </button>
             </>
           ) : null}
         </p>

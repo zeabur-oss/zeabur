@@ -19,6 +19,7 @@ import { openAdd, type AddWhat } from "@/lib/adding"
 import { creatable, engineName, engines, type Engine } from "@/model/databases"
 import { gitNeeds } from "@/model/git-service"
 import type { Gate } from "@/model/rights"
+import { useOpenComponent } from "@/components/component-installs"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Menu,
@@ -247,6 +248,7 @@ export function AddMenu({ project, compact = false }: { project: string; compact
 
 /** An entry: open, closed by the role, or what the cluster lacks with a link to install it. */
 function EntryItem({ entry, onOpen }: { entry: AddEntry; onOpen: () => void }) {
+  const open = useOpenComponent()
   const { install } = entry
   if (entry.why === undefined)
     return (
@@ -258,9 +260,7 @@ function EntryItem({ entry, onOpen }: { entry: AddEntry; onOpen: () => void }) {
     <MenuItem
       data-testid={entryTestid(entry.what)}
       disabled={!install}
-      render={
-        install ? <Link to="/cluster/components" search={{ component: install.id }} /> : undefined
-      }
+      onClick={install ? () => open(install.id) : undefined}
     >
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className={install ? undefined : "text-muted-foreground"}>{entry.label}</span>

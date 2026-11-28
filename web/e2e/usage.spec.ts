@@ -87,10 +87,9 @@ test("without metrics-server, the reserved amounts stay and Install is offered",
   await page.goto(page_)
   const panel = page.getByRole("region", { name: "Current usage" })
   await expect(panel).toContainText("Live usage needs metrics-server.")
-  await expect(panel.getByRole("link", { name: "Install" })).toHaveAttribute(
-    "href",
-    /\/cluster\/components\?component=metrics-server/,
-  )
+  await panel.getByRole("button", { name: "Install" }).click()
+  await expect(page.getByRole("dialog", { name: /Metrics Server/ })).toBeVisible()
+  await page.keyboard.press("Escape")
   await expect(panel).toContainText(/Each replica \(×\d+\)/)
   await page.goto(`/projects/${encodeURIComponent(namespace)}?view=list`)
   const table = page.getByRole("table", { name: /Services/ })

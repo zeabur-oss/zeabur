@@ -1,7 +1,6 @@
 // Cluster → Backups: Velero's backups of every object and the files in volumes, and restoring
 // one into the namespaces it holds.
 import { useMutation, useQuery, type UseQueryResult } from "@tanstack/react-query"
-import { Link } from "@tanstack/react-router"
 import { useId, useState, type ReactNode } from "react"
 import DownloadSimpleIcon from "~icons/ph/download-simple"
 import WarningIcon from "~icons/ph/warning"
@@ -63,6 +62,7 @@ import { ClusterFrame } from "@/routes/cluster/frame"
 import { Forbidden, type Role } from "@/routes/cluster/forbidden"
 import { S3DestinationsSection } from "@/routes/cluster/s3-destinations"
 import { FormButtons, Section } from "@/routes/cluster/section"
+import { useOpenComponent } from "@/components/component-installs"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
 import { Checkbox } from "@zeabur-oss/design-system/components/checkbox"
@@ -130,6 +130,7 @@ function BackupsBody({ backups }: { backups: UseQueryResult<Data> }) {
 }
 
 function NotInstalled({ data }: { data: Schemas.ClusterBackups }) {
+  const open = useOpenComponent()
   const t = useT()
   const velero = providerOf(data.providers, "velero")?.component
   return (
@@ -144,13 +145,13 @@ function NotInstalled({ data }: { data: Schemas.ClusterBackups }) {
         </EmptyHeader>
         {velero ? (
           <EmptyContent>
-            <Link
-              to="/cluster/components"
-              search={{ component: velero.id }}
+            <button
+              type="button"
+              onClick={() => open(velero.id)}
               className={buttonVariants({ size: "sm" })}
             >
               {t("clusterBackups.install")}
-            </Link>
+            </button>
           </EmptyContent>
         ) : null}
       </Empty>

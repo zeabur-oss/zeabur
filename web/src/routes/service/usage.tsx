@@ -40,6 +40,7 @@ import { Meter } from "@zeabur-oss/design-system/components/meter"
 import { SummaryCardAside } from "@zeabur-oss/design-system/components/summary-card"
 import { useStorage } from "@/components/storage-class"
 import { canGrow } from "@/model/storage"
+import { useOpenComponent } from "@/components/component-installs"
 
 const HistoryChart = lazy(() => import("@/routes/service/history-chart"))
 
@@ -51,6 +52,7 @@ const VIA_HINTS = {
 } as const
 
 export function UsagePanel({ project, service }: { project: string; service: Service }) {
+  const open = useOpenComponent()
   const t = useT()
   const usage = useQuery(usageQuery(project))
   const state = usage.data?.state
@@ -127,13 +129,13 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
         {state === "not-installed" ? (
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-5 py-3 text-sm text-muted-foreground">
             {t("usage.needsMetricsServer")}
-            <Link
-              to="/cluster/components"
-              search={{ component: "metrics-server" }}
+            <button
+              type="button"
+              onClick={() => open("metrics-server")}
               className="font-medium text-foreground hover:underline"
             >
               {t("usage.install")}
-            </Link>
+            </button>
           </p>
         ) : null}
         {state === "unreadable" ? (
@@ -636,6 +638,7 @@ function HistoryBody({
   history: ServiceHistory
   split: "replica" | "total"
 }) {
+  const open = useOpenComponent()
   const t = useT()
   const f = useFormat()
   const range = history.range
@@ -645,13 +648,13 @@ function HistoryBody({
       return (
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
           {t("usage.needsStore")}
-          <Link
-            to="/cluster/components"
-            search={{ component: "victoria-metrics" }}
+          <button
+            type="button"
+            onClick={() => open("victoria-metrics")}
             className="font-medium text-foreground hover:underline"
           >
             {t("usage.installVm")}
-          </Link>
+          </button>
           <Link to="/settings" className="font-medium text-foreground hover:underline">
             {t("usage.chooseStore")}
           </Link>

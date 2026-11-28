@@ -1,7 +1,6 @@
 // Notifications: where a project's alerts go, or the cluster's. Each channel is a
 // VMAlertmanagerConfig and a Secret; every change is a plan.
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { Link } from "@tanstack/react-router"
 import { useId, useState } from "react"
 import { toast } from "sonner"
 import DotsThreeIcon from "~icons/ph/dots-three"
@@ -23,6 +22,7 @@ import { Problem } from "@/components/problem"
 import { permission, Refused } from "@/components/refused"
 import { StatusDot, StatusPill } from "@/components/status"
 import { useT } from "@/i18n"
+import { useOpenComponent } from "@/components/component-installs"
 import {
   FIELDS,
   formOf,
@@ -85,6 +85,7 @@ export function Notifications({ project }: { project?: string }) {
 }
 
 function NotInstalled({ component }: { component?: Schemas.ComponentRef | null }) {
+  const open = useOpenComponent()
   const t = useT()
   return (
     <Empty variant="outline">
@@ -97,13 +98,13 @@ function NotInstalled({ component }: { component?: Schemas.ComponentRef | null }
       </EmptyHeader>
       {component ? (
         <EmptyContent>
-          <Link
-            to="/cluster/components"
-            search={{ component: component.id }}
+          <button
+            type="button"
+            onClick={() => open(component.id)}
             className={buttonVariants({ size: "sm" })}
           >
             {t("notify.install")}
-          </Link>
+          </button>
         </EmptyContent>
       ) : null}
     </Empty>

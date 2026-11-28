@@ -43,7 +43,6 @@ import { NotFound } from "@/components/not-found"
 import { RouteError, RoutePending } from "@/components/route-states"
 import { canonicalKind, isTask } from "@/model/service"
 import {
-  componentsSearch,
   gitHubAppContinueSearch,
   gitHubAppSearch,
   objectsSearch,
@@ -307,7 +306,6 @@ const clusterNotificationsRoute = createRoute({
 const componentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/cluster/components",
-  validateSearch: componentsSearch,
   loader: () => load(ensure(clusterQuery), ensure(upgradesQuery), ensure(capabilitiesQuery)),
   component: lazyRouteComponent(() => import("@/routes/cluster/components"), "ComponentsPage"),
 })

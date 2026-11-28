@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils"
 import { serviceLink } from "@/lib/place"
 import { fixOf, type fixLink } from "@/model/fixes"
 import { suggestionsOf } from "@/model/overview"
+import { useOpenComponent } from "@/components/component-installs"
 
 type Gap = Schemas.Gap
 
@@ -111,6 +112,7 @@ function GapRow({
   onPlan?: () => void
   form?: ReturnType<typeof fixLink>
 }) {
+  const open = useOpenComponent()
   const t = useT()
   const write = useSentence()
   return (
@@ -132,13 +134,13 @@ function GapRow({
           </Link>
         ) : null}
         {gap.fix.kind === "install" ? (
-          <Link
-            to="/cluster/components"
-            search={{ component: gap.fix.id }}
+          <button
+            type="button"
+            onClick={() => open(gap.fix.id)}
             className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
             {t("gap.install")}
-          </Link>
+          </button>
         ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 type-meta text-muted-foreground">

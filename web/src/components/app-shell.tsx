@@ -7,7 +7,7 @@ import XIcon from "~icons/ph/x"
 import { GatedPage } from "@/components/shell/admin-only"
 import { RouteProgress } from "@/components/shell/route-progress"
 import { PlanFallback } from "@/components/plan/fallback"
-import { InstallIndicator } from "@/components/install-indicator"
+import { ComponentInstalls } from "@/components/component-installs"
 import { CommandPalette } from "@/components/shell/command-palette"
 import { DockSlot } from "@/components/shell/dock-slot"
 import { Sidebar } from "@/components/shell/sidebar"
@@ -52,63 +52,64 @@ export function AppShell() {
 
   return (
     <TooltipProvider>
-      <AppFrame>
-        <a
-          href="#content"
-          className="sr-only z-50 rounded-md bg-background px-3 py-2 text-sm focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
-        >
-          {t("shell.skip")}
-        </a>
-        <FrameSidebar>{nav}</FrameSidebar>
-        <FramePanel>
-          <RouteProgress />
-          <PhoneBar />
-          <main
-            ref={content}
-            id="content"
-            tabIndex={-1}
-            className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain outline-none page-transition"
+      <ComponentInstalls>
+        <AppFrame>
+          <a
+            href="#content"
+            className="sr-only z-50 rounded-md bg-background px-3 py-2 text-sm focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
           >
-            <GatedPage route={place.route}>
-              <Outlet />
-            </GatedPage>
-          </main>
-          <DockSlot />
-        </FramePanel>
-      </AppFrame>
-      <Dialog open={mobileOpen} onOpenChange={(open) => mobileNav.set(open)}>
-        <DialogContent variant="sheet" className="flex flex-col" aria-describedby={undefined}>
-          <DialogTitle className="sr-only">{t("shell.menu")}</DialogTitle>
-          <Button
-            variant="muted"
-            size="icon-sm"
-            onClick={() => mobileNav.set(false)}
-            className="absolute top-5 right-3 z-10"
-            aria-label={t("common.close")}
-          >
-            <XIcon aria-hidden="true" />
-          </Button>
-          <div
-            onClickCapture={(event) => {
-              if ((event.target as HTMLElement).closest("a")) mobileNav.set(false)
-            }}
-            className="flex min-h-0 flex-1 flex-col"
-          >
-            {nav}
-          </div>
-        </DialogContent>
-      </Dialog>
-      <CommandPalette />
-      <PlanFallback />
-      <InstallIndicator />
-      {add ? (
-        <Suspense fallback={null}>
-          <AddHost key={`${add.project}/${add.what}`} project={add.project} what={add.what} />
+            {t("shell.skip")}
+          </a>
+          <FrameSidebar>{nav}</FrameSidebar>
+          <FramePanel>
+            <RouteProgress />
+            <PhoneBar />
+            <main
+              ref={content}
+              id="content"
+              tabIndex={-1}
+              className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain outline-none page-transition"
+            >
+              <GatedPage route={place.route}>
+                <Outlet />
+              </GatedPage>
+            </main>
+            <DockSlot />
+          </FramePanel>
+        </AppFrame>
+        <Dialog open={mobileOpen} onOpenChange={(open) => mobileNav.set(open)}>
+          <DialogContent variant="sheet" className="flex flex-col" aria-describedby={undefined}>
+            <DialogTitle className="sr-only">{t("shell.menu")}</DialogTitle>
+            <Button
+              variant="muted"
+              size="icon-sm"
+              onClick={() => mobileNav.set(false)}
+              className="absolute top-5 right-3 z-10"
+              aria-label={t("common.close")}
+            >
+              <XIcon aria-hidden="true" />
+            </Button>
+            <div
+              onClickCapture={(event) => {
+                if ((event.target as HTMLElement).closest("a")) mobileNav.set(false)
+              }}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              {nav}
+            </div>
+          </DialogContent>
+        </Dialog>
+        <CommandPalette />
+        <PlanFallback />
+        {add ? (
+          <Suspense fallback={null}>
+            <AddHost key={`${add.project}/${add.what}`} project={add.project} what={add.what} />
+          </Suspense>
+        ) : null}
+        <Suspense fallback={<div aria-live="polite" />}>
+          <Toaster theme={theme} position="bottom-right" containerAriaLabel={t("toast.region")} />
         </Suspense>
-      ) : null}
-      <Suspense fallback={<div aria-live="polite" />}>
-        <Toaster theme={theme} position="bottom-right" containerAriaLabel={t("toast.region")} />
-      </Suspense>
+      </ComponentInstalls>
     </TooltipProvider>
   )
 }

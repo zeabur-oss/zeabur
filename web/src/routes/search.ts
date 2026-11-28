@@ -148,11 +148,6 @@ export const objectsSearch = z.object({
   empty: flag,
 })
 
-export const componentsSearch = z.object({
-  /** `capability/id` of the component whose install steps are open. */
-  component: text,
-})
-
 /** Cluster → GitHub: what GitHub sends back at the end of its manifest flow, and the project
  * whose Git form led here. */
 export const gitHubAppSearch = z.object({

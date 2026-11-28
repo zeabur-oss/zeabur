@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { getRouteApi, Link, useNavigate } from "@tanstack/react-router"
-import { lazy, Suspense, useState } from "react"
+import { useState } from "react"
 import ArchiveIcon from "~icons/ph/archive"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import ArrowsClockwiseIcon from "~icons/ph/arrows-clockwise"
@@ -27,11 +26,12 @@ import TextAlignLeftIcon from "~icons/ph/text-align-left"
 import { isStatus, type Schemas } from "@/api/client"
 import { capabilitiesQuery, catalogQuery, clusterIncidentsQuery } from "@/api/queries"
 import { useCapabilityLabel } from "@/components/capabilities"
+import { useOpenComponent } from "@/components/component-installs"
 import { Segmented } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
-import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
@@ -39,18 +39,10 @@ import { type Locale, useI18n, useT } from "@/i18n"
 import type { Icon } from "@/lib/icon"
 import { docsUrl } from "@/lib/docs"
 import { formatAgo } from "@/lib/format"
-import { cn } from "@/lib/utils"
+import { buttonOf } from "@/model/component-button"
 import { componentsRole, Forbidden } from "@/routes/cluster/forbidden"
 import { ClusterFrame } from "@/routes/cluster/frame"
 import { Section } from "@/routes/cluster/section"
-
-const route = getRouteApi("/cluster/components")
-
-const ComponentPlan = lazy(() =>
-  import("@/components/component-plan").then((m) => ({
-    default: m.ComponentPlan,
-  })),
-)
 
 const categories: {
   key: "traffic" | "observability" | "scaling" | "security" | "data" | "operations"
@@ -116,8 +108,6 @@ export function ComponentsPage() {
   const { t, locale } = useI18n()
   const capLabel = useCapabilityLabel()
   const capabilities = useQuery(capabilitiesQuery)
-  const search = route.useSearch()
-  const navigate = useNavigate({ from: "/cluster/components" })
   const [filter, setFilter] = useState<Filter>("all")
   const [query, setQuery] = useState("")
 
@@ -153,18 +143,6 @@ export function ComponentsPage() {
 
   return (
     <ClusterFrame tab="components">
-      {search.component && capabilities.data ? (
-        <OpenedPlan
-          key={search.component}
-          id={search.component}
-          list={list}
-          onClose={() =>
-            void navigate({
-              search: (previous) => ({ ...previous, component: undefined }),
-            })
-          }
-        />
-      ) : null}
       <CatalogStatus />
       <InstalledSection />
 
@@ -262,15 +240,6 @@ const stateOf = (
       ? "installed"
       : (suggestion ?? "optional")
 
-/** Install when nothing is installed, manage what Zeabur may have installed; nothing for a
- * component K3s, RKE2 or Helm manages. The dialog's plan decides between installing and removing. */
-const buttonOf = (installation: Schemas.Installation | undefined) =>
-  !installation
-    ? "install"
-    : installation.source === "zeabur" || installation.source === "other"
-      ? "manage"
-      : undefined
-
 /** The installed components an incident says are down, by capability or component id: the
  * catalogue's names, as the incident gives them. */
 function useDown() {
@@ -281,30 +250,6 @@ function useDown() {
       .flatMap((i) => (i.fault.component ? [i.fault.component] : [])),
   )
   return (capability: string, component: string) => down.has(capability) || down.has(component)
-}
-
-/** The plan of the component in the address. */
-function OpenedPlan({
-  id,
-  list,
-  onClose,
-}: {
-  id: string
-  list: Schemas.Capability[]
-  onClose: () => void
-}) {
-  const opened = list.flatMap((c) => c.components).find((x) => x.id === id)
-  const installation = list.flatMap((c) => c.installations).find((i) => i.component === id)
-  return (
-    <Suspense fallback={null}>
-      <ComponentPlan
-        id={id}
-        name={opened?.displayName ?? id}
-        installed={buttonOf(installation) === "manage"}
-        onClose={onClose}
-      />
-    </Suspense>
-  )
 }
 
 /** Which Zeabur Catalog release the page shows, and why Zeabur could not read a newer one. */
@@ -439,9 +384,8 @@ function PackagedNote({ by, chart }: { by: string; chart: string }) {
   )
 }
 
-/** Opens the component's plan. */
-/** A component Zeabur cannot install yet opens the same dialog, which says how to install it
- * another way. */
+/** Opens the component's plan. A component Zeabur cannot install yet opens the same dialog, which
+ * says how to install it another way. */
 function CardAction({
   id,
   button,
@@ -452,22 +396,17 @@ function CardAction({
   unsupported: boolean
 }) {
   const t = useT()
+  const open = useOpenComponent()
   const catalog = useQuery(catalogQuery).data
   const offline = catalog !== undefined && !catalog.version
   if (!button) return null
   return (
-    <Link
-      from="/cluster/components"
-      search={(previous) => ({
-        ...previous,
-        component: id,
-      })}
+    <Button
+      variant="outline"
+      size="xs"
       disabled={offline}
-      aria-disabled={offline}
-      className={cn(
-        buttonVariants({ variant: "outline", size: "xs" }),
-        "ml-auto aria-disabled:pointer-events-none aria-disabled:opacity-50",
-      )}
+      onClick={() => open(id)}
+      className="ml-auto"
     >
       {button === "manage" ? (
         <>
@@ -477,7 +416,7 @@ function CardAction({
       ) : (
         <InstallLabel unsupported={unsupported} />
       )}
-    </Link>
+    </Button>
   )
 }
 

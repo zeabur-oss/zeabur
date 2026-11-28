@@ -1,6 +1,5 @@
 // Cluster → Backups: which data is backed up by what, and whether that tool is there.
 import { useQuery } from "@tanstack/react-query"
-import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 
 import type { Schemas } from "@/api/client"
@@ -10,6 +9,7 @@ import { useT } from "@/i18n"
 import { providerOf } from "@/model/cluster-backups"
 import type { Health } from "@/model/service"
 import { Section } from "@/routes/cluster/section"
+import { useOpenComponent } from "@/components/component-installs"
 
 export function BackupCoverage({ data }: { data?: Schemas.ClusterBackups }) {
   const t = useT()
@@ -111,32 +111,33 @@ function Tool({
   provider?: Schemas.BackupProvider
   unfinished: Unfinished
 }) {
+  const open = useOpenComponent()
   const t = useT()
   const component = provider?.component
   if (!component || provider.state === "refused") return <Plain>—</Plain>
   if (unfinished(provider))
     return (
       <Dot health="warn">
-        <Link
-          to="/cluster/components"
-          search={{ component: component.id }}
+        <button
+          type="button"
+          onClick={() => open(component.id)}
           className="underline underline-offset-2"
         >
           {t("clusterBackups.coverage.unfinished", component.name)}
-        </Link>
+        </button>
       </Dot>
     )
   if (provider.state === "installed")
     return <Dot health="ok">{t("clusterBackups.coverage.installed", component.name)}</Dot>
   return (
     <Dot health="idle">
-      <Link
-        to="/cluster/components"
-        search={{ component: component.id }}
+      <button
+        type="button"
+        onClick={() => open(component.id)}
         className="underline underline-offset-2"
       >
         {t("clusterBackups.coverage.install", component.name)}
-      </Link>
+      </button>
     </Dot>
   )
 }
