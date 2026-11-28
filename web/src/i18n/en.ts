@@ -2511,13 +2511,6 @@ export const en = {
     `The backup goes into a new project, ${into}, with its own copy of every service, volume and database. ${source} is not touched.`,
   "clusterBackups.copy.keep": (source: string) =>
     `The original project ${source} is kept. Delete it when you no longer need it.`,
-  "clusterBackups.copy.amount": (cpu: string, memory: string) => `${cpu} and ${memory}`,
-  "clusterBackups.copy.short": (need: string, free: string) =>
-    `Both projects run at once. The new one asks for ${need}, but the nodes have ${free} left, so some services may not start. Stop services you don't need, or add a node.`,
-  "clusterBackups.copy.fits": (need: string, free: string) =>
-    `Both projects run at once: the new one asks for ${need}, and the nodes have ${free} left.`,
-  "clusterBackups.copy.roomUnknown": (need: string) =>
-    `Both projects run at once, and the new one asks for ${need}. Zeabur couldn't read how much the nodes have left.`,
   "clusterBackups.copy.webhooks": (source: string) =>
     `Auto deploy and Git webhooks still go to ${source}.`,
   "clusterBackups.goneBody": (source: string) =>
@@ -2800,8 +2793,6 @@ export const en = {
   "add.templateFilter": "Filter templates",
   "add.templateNoMatch": (query: string) => `No template matches “${query}”.`,
   "add.templateNeeds": (cpu: string, memory: string) => `Needs ${cpu} and ${memory} of memory`,
-  "add.templateTightMemory": "Not enough memory free",
-  "add.templateTightCpu": "Not enough CPU free",
   "add.installFirst": (names: string) => `Install ${names} first`,
   "add.templateDeploy": (name: string) => `Deploy ${name}`,
   "add.templateBack": "All templates",
@@ -2811,12 +2802,6 @@ export const en = {
     `Zeabur can't tell whether ${names} is installed. If it isn't, the review says so.`,
   "add.templateNoIssuer":
     "This app needs HTTPS, but Zeabur has no certificate issuer set. An administrator can set one with --cluster-issuer when starting Zeabur.",
-  "add.templateRoom": (use: string, free: string) =>
-    `The cluster has room for it: it needs ${use} of memory, and ${free} is free.`,
-  "add.templateLowMemory": (use: string, free: string) =>
-    `The cluster is low on memory for it: it needs ${use}, and ${free} is free across the nodes, but each pod must fit on one node. Make room or add a node first.`,
-  "add.templateLowCpu": (use: string, free: string) =>
-    `The cluster is low on CPU for it: it needs ${use}, and ${free} is free across the nodes, but each pod must fit on one node. Make room or add a node first.`,
   "add.templateGenerated": (secrets: string) =>
     `Passwords and keys are generated in your browser and kept in secret ${secrets}.`,
   "add.templateInputEmpty": "Fill this in.",
@@ -4249,12 +4234,6 @@ export const en = {
   "domainPages.noServer": "This project has no page server yet",
   "domainPages.noServerHint":
     "These pages come from the Error pages template. Turning either switch on or editing a page also deploys it here: a small nginx.",
-  "domainPages.room": (use: string, free: string) =>
-    `The cluster has room for it: it needs about ${use} of memory, and ${free} is free.`,
-  "domainPages.tightMemory": (use: string, free: string) =>
-    `The cluster is low on memory for it: it needs about ${use}, and ${free} is free across the nodes, but its pod must fit on one node. Make room or add a node first.`,
-  "domainPages.tightCpu": (use: string, free: string) =>
-    `The cluster is low on CPU for it: it needs about ${use}, and ${free} is free across the nodes, but its pod must fit on one node. Make room or add a node first.`,
   "domainPages.page": "Page to edit",
   "domainPages.page.maintenance": "Maintenance",
   "domainPages.page.badGateway": "502 Bad gateway",

@@ -4,7 +4,7 @@ import ArrowLeftIcon from "~icons/ph/arrow-left"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CaretRightIcon from "~icons/ph/caret-right"
 
-import { clusterQuery, templateRoomsQuery, templatesQuery } from "@/api/queries"
+import { clusterQuery, templatesQuery } from "@/api/queries"
 import { FormField, TrimmedInput } from "@/components/form-field"
 import { InstallAlert } from "@/components/lazy-installer-sheet"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
@@ -92,12 +92,6 @@ export function TemplateDrawer({ project, onClose }: { project: string; onClose:
   )
 }
 
-/** Whether the cluster has room for the template; nothing when the server cannot tell. */
-function useRoom(template: AppTemplate) {
-  const room = useQuery(templateRoomsQuery).data?.items[template.id]
-  return room?.fit === "unknown" ? undefined : room
-}
-
 function TemplateList({ items, onPick }: { items: AppTemplate[]; onPick: (id: string) => void }) {
   const t = useT()
   const { locale } = useI18n()
@@ -138,12 +132,7 @@ function TemplateRow({
   const t = useT()
   const { locale } = useI18n()
   const q = useQuantityFormat()
-  const room = useRoom(template)
   const absent = missing(template)
-  const tight =
-    room?.fit === "short"
-      ? t(room.resource === "cpu" ? "add.templateTightCpu" : "add.templateTightMemory")
-      : undefined
   return (
     <button
       type="button"
@@ -173,8 +162,6 @@ function TemplateRow({
               ),
             )}
           </span>
-        ) : tight ? (
-          <span className="type-meta text-warn-strong">{tight}</span>
         ) : null}
       </span>
       <CaretRightIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -224,7 +211,6 @@ function DeployForm({
     >
       <About template={template} />
       <Requirements template={template} issuer={domains.clusterIssuer} />
-      <RoomNote template={template} />
       <Risks template={template} />
       {template.needsDomain ? (
         <DomainField
@@ -410,26 +396,6 @@ function Risks({ template }: { template: AppTemplate }) {
         </ul>
       </CollapsibleContent>
     </Collapsible>
-  )
-}
-
-function RoomNote({ template }: { template: AppTemplate }) {
-  const t = useT()
-  const q = useQuantityFormat()
-  const room = useRoom(template)
-  if (!room) return null
-  const [use, free] =
-    room.resource === "cpu"
-      ? [q.cpu(room.need), q.cpu(room.free)]
-      : [q.memory(room.need), q.memory(room.free)]
-  if (room.fit === "fits")
-    return <p className="type-meta text-muted-foreground">{t("add.templateRoom", use, free)}</p>
-  return (
-    <Alert variant="warn">
-      <AlertDescription>
-        {t(room.resource === "cpu" ? "add.templateLowCpu" : "add.templateLowMemory", use, free)}
-      </AlertDescription>
-    </Alert>
   )
 }
 

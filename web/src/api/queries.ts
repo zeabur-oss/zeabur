@@ -207,15 +207,6 @@ export const templatesQuery = queryOptions({
   queryFn: async ({ signal }) => await zeabur.listTemplates({ signal }),
 })
 
-/** Whether the cluster has room for each template's pods, each on one node. */
-export const templateRoomsQuery = queryOptions({
-  queryKey: ["cluster", "template-rooms"],
-  queryFn: async ({ signal }) => await zeabur.listTemplateRooms({ signal }),
-  refetchInterval: CLUSTER_POLL,
-  refetchIntervalInBackground: false,
-  retryOnMount: false,
-})
-
 export const clusterUsageQuery = queryOptions({
   queryKey: ["cluster", "usage"],
   queryFn: async ({ signal }) => await zeabur.getClusterUsage({ signal }),

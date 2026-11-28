@@ -94,9 +94,9 @@ Restoring takes three steps: restore the project, check its services and data, t
    - The restore leaves out domains: it excludes Ingress, HTTPRoute, and cert-manager certificates. You reconnect domains in the last step, and cert-manager then requests new certificates.
    - When restoring to a new project, scheduled jobs from the backup start paused so the same job doesn't run in both projects. When restoring under the original name, scheduled jobs run as usual.
    - When restoring to a new project, the page lists services and secrets from the backup. Values containing `<service>.<source-project>.svc` still point to the original project. Use **Rewrite addresses** after restoring to update them.
-   - When restoring to a new project, the page shows whether the nodes have enough resources to run both projects at once. Auto-deployments and Git webhooks still target the original project.
+   - When restoring to a new project, auto-deployments and Git webhooks still target the original project.
 
-   ![Review showing the new project, service addresses to rewrite, and node resources](../images/shots/backup-restore-plan.avif)
+   ![Review showing the new project, and service addresses to rewrite](../images/shots/backup-restore-plan.avif)
 
    If the original project still exists, click **New project from backup**. If it has been deleted, click **Restore**.
 

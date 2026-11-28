@@ -2312,13 +2312,6 @@ export const zhTW: Messages = {
   "clusterBackups.copy.into": (source, into) =>
     `備份會還原到新專案 ${into}，服務、磁碟區和資料庫都是另外一份。${source} 不會變動。`,
   "clusterBackups.copy.keep": (source) => `原本的專案 ${source} 會繼續保留，不需要時請刪除。`,
-  "clusterBackups.copy.amount": (cpu, memory) => `${cpu}、${memory} 記憶體`,
-  "clusterBackups.copy.short": (need, free) =>
-    `兩個專案會同時執行。新專案需要 ${need}，節點只剩 ${free}，部分服務可能無法啟動。先停掉用不到的服務，或加一台節點。`,
-  "clusterBackups.copy.fits": (need, free) =>
-    `兩個專案會同時執行：新專案需要 ${need}，節點還剩 ${free}。`,
-  "clusterBackups.copy.roomUnknown": (need) =>
-    `兩個專案會同時執行，新專案需要 ${need}。Zeabur 讀不到節點還剩多少資源。`,
   "clusterBackups.copy.webhooks": (source) => `自動部署和 Git webhook 仍然會送到 ${source}。`,
   "clusterBackups.goneBody": (source) =>
     `${source} 已經不存在，會用原本的名稱還原。網域等你確認過專案後，最後再接回來。`,
@@ -2567,8 +2560,6 @@ export const zhTW: Messages = {
   "add.templateFilter": "篩選範本",
   "add.templateNoMatch": (query) => `沒有符合「${query}」的範本。`,
   "add.templateNeeds": (cpu, memory) => `需要 ${cpu} CPU、${memory} 記憶體`,
-  "add.templateTightMemory": "叢集記憶體不夠",
-  "add.templateTightCpu": "叢集 CPU 不夠",
   "add.installFirst": (names) => `需要先安裝 ${names}`,
   "add.templateDeploy": (name) => `部署 ${name}`,
   "add.templateBack": "所有範本",
@@ -2578,11 +2569,6 @@ export const zhTW: Messages = {
     `Zeabur 無法確認 ${names} 是否已安裝；如果沒裝，檢查變更時會提醒你。`,
   "add.templateNoIssuer":
     "這個應用程式需要 HTTPS，但 Zeabur 還沒指定憑證簽發者。管理員可以在啟動 Zeabur 時用 --cluster-issuer 指定。",
-  "add.templateRoom": (use, free) => `叢集放得下：需要 ${use} 記憶體，目前還有 ${free}。`,
-  "add.templateLowMemory": (use, free) =>
-    `叢集記憶體不夠：需要 ${use}，所有節點加起來還有 ${free}，但每個 Pod 都要放得進單一節點。先騰出空間或加一台節點。`,
-  "add.templateLowCpu": (use, free) =>
-    `叢集 CPU 不夠：需要 ${use}，所有節點加起來還有 ${free}，但每個 Pod 都要放得進單一節點。先騰出空間或加一台節點。`,
   "add.templateGenerated": (secrets) => `密碼和金鑰會在你的瀏覽器產生，存進機密變數 ${secrets}。`,
   "add.templateInputEmpty": "這一欄必填。",
   "add.templateInputInvalid": (pattern) => `格式不符（${pattern}）。`,
@@ -3876,12 +3862,6 @@ export const zhTW: Messages = {
   "domainPages.noServer": "這個專案還沒有頁面伺服器",
   "domainPages.noServerHint":
     "這些頁面由 Error pages 範本提供，範本是一個小型 nginx。開啟任一個開關或編輯頁面時，會一併部署到這個專案。",
-  "domainPages.room": (use, free) =>
-    `叢集還有空間：頁面伺服器大約需要 ${use} 記憶體，目前還有 ${free} 可用。`,
-  "domainPages.tightMemory": (use, free) =>
-    `叢集的記憶體不太夠：頁面伺服器大約需要 ${use}，所有節點加起來還有 ${free}，但它要放得進單一節點。先騰出空間或加一個節點。`,
-  "domainPages.tightCpu": (use, free) =>
-    `叢集的 CPU 不太夠：頁面伺服器大約需要 ${use}，所有節點加起來還有 ${free}，但它要放得進單一節點。先騰出空間或加一個節點。`,
   "domainPages.page": "要編輯的頁面",
   "domainPages.page.maintenance": "維護",
   "domainPages.page.badGateway": "502 閘道錯誤",

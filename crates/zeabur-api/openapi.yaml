@@ -1204,25 +1204,6 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
-  /api/v1/cluster/template-rooms:
-    get:
-      tags:
-      - cluster
-      summary: |-
-        Whether the cluster has room for each template's pods, read as the person once for all of
-        them: `unknown` when the nodes or the pods cannot be read whole.
-      operationId: listTemplateRooms
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TemplateRooms"
-        "500":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/templates:
     get:
       tags:
@@ -10381,13 +10362,6 @@ components:
             enum:
             - renamed
       description: A field of a service that is left out, or a difference to know of.
-    Fit:
-      type: string
-      description: Whether pods fit on the nodes.
-      enum:
-      - fits
-      - short
-      - unknown
     Fix:
       type: object
       description: The fix of a gap.
@@ -17149,11 +17123,6 @@ components:
           - $ref: "#/components/schemas/VeleroBackupInventory"
             description: What the backup holds of `source`; absent when Velero's list could not be read.
           - type: "null"
-        room:
-          oneOf:
-          - $ref: "#/components/schemas/RestoreRoom"
-            description: Room for a second copy; absent under the same name.
-          - type: "null"
         sameName:
           type: boolean
           description: The original no longer exists, so the backup goes back under its own name.
@@ -17165,39 +17134,6 @@ components:
           - string
           - "null"
           description: Why Velero's list could not be read.
-    RestoreRoom:
-      type: object
-      description: The room the copy needs and the room there is.
-      required:
-      - fit
-      - needCpu
-      - needMemory
-      - freeCpu
-      - freeMemory
-      properties:
-        fit:
-          $ref: "#/components/schemas/Fit"
-          description: Whether each of the original's pods fits on a node.
-        freeCpu:
-          type: integer
-          format: int64
-          description: "What the nodes have left in total: millicores."
-          minimum: 0
-        freeMemory:
-          type: integer
-          format: int64
-          description: Bytes.
-          minimum: 0
-        needCpu:
-          type: integer
-          format: int64
-          description: "What the original's running pods request: millicores."
-          minimum: 0
-        needMemory:
-          type: integer
-          format: int64
-          description: Bytes.
-          minimum: 0
     RevealedSecret:
       type: object
       description: A Secret's values, shown because the person asked.
@@ -17496,12 +17432,6 @@ components:
       - stuck
       - paused
       - waitsForDeletion
-    RoomResource:
-      type: string
-      description: CPU or memory.
-      enum:
-      - memory
-      - cpu
     Route:
       type: object
       description: |-
@@ -19307,44 +19237,6 @@ components:
         risk:
           type: string
           description: The risk, in English.
-    TemplateRoom:
-      type: object
-      description: Whether the cluster has room for a template's pods.
-      required:
-      - fit
-      - resource
-      - need
-      - free
-      properties:
-        fit:
-          $ref: "#/components/schemas/Fit"
-          description: Whether each pod fits on a node.
-        free:
-          type: integer
-          format: int64
-          description: What the ready, schedulable nodes have free of it in all.
-          minimum: 0
-        need:
-          type: integer
-          format: int64
-          description: "What the template's pods need of it in all: bytes or millicores."
-          minimum: 0
-        resource:
-          $ref: "#/components/schemas/RoomResource"
-          description: "The resource `need` and `free` are about: the one that is short, else memory."
-    TemplateRooms:
-      type: object
-      description: The room for each template.
-      required:
-      - items
-      properties:
-        items:
-          type: object
-          description: By template id.
-          additionalProperties:
-            $ref: "#/components/schemas/TemplateRoom"
-          propertyNames:
-            type: string
     TemplateService:
       type: object
       description: A service of a template.

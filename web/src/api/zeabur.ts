@@ -830,52 +830,12 @@ export type VeleroBackupInventory = {
 }
 
 /**
- * Whether pods fit on the nodes.
- */
-export type Fit = (typeof Fit)[keyof typeof Fit]
-
-export const Fit = {
-  fits: "fits",
-  short: "short",
-  unknown: "unknown",
-} as const
-
-/**
- * The room the copy needs and the room there is.
- */
-export type RestoreRoom = {
-  /** Whether each of the original's pods fits on a node. */
-  fit: Fit
-  /**
-   * What the nodes have left in total: millicores.
-   * @minimum 0
-   */
-  freeCpu: number
-  /**
-   * Bytes.
-   * @minimum 0
-   */
-  freeMemory: number
-  /**
-   * What the original's running pods request: millicores.
-   * @minimum 0
-   */
-  needCpu: number
-  /**
-   * Bytes.
-   * @minimum 0
-   */
-  needMemory: number
-}
-
-/**
  * What a project restore reports.
  */
 export type RestoreCopy = {
   /** The namespace it is restored into. */
   into: string
   inventory?: VeleroBackupInventory | null
-  room?: RestoreRoom | null
   /** The original no longer exists, so the backup goes back under its own name. */
   sameName: boolean
   /** The namespace restored. */
@@ -10583,16 +10543,6 @@ export type RolloutProgress = {
 }
 
 /**
- * CPU or memory.
- */
-export type RoomResource = (typeof RoomResource)[keyof typeof RoomResource]
-
-export const RoomResource = {
-  memory: "memory",
-  cpu: "cpu",
-} as const
-
-/**
  * The way to one address of a service.
  */
 export type RouteTrace = {
@@ -11184,39 +11134,6 @@ export type TemplateView = {
 export type TemplateList = {
   /** Every template, by id. */
   items: TemplateView[]
-}
-
-/**
- * Whether the cluster has room for a template's pods.
- */
-export type TemplateRoom = {
-  /** Whether each pod fits on a node. */
-  fit: Fit
-  /**
-   * What the ready, schedulable nodes have free of it in all.
-   * @minimum 0
-   */
-  free: number
-  /**
-   * What the template's pods need of it in all: bytes or millicores.
-   * @minimum 0
-   */
-  need: number
-  /** The resource `need` and `free` are about: the one that is short, else memory. */
-  resource: RoomResource
-}
-
-/**
- * By template id.
- */
-export type TemplateRoomsItems = { [key: string]: TemplateRoom }
-
-/**
- * The room for each template.
- */
-export type TemplateRooms = {
-  /** By template id. */
-  items: TemplateRoomsItems
 }
 
 /**
@@ -12699,23 +12616,6 @@ export const planS3Destinations = async (
     method: "POST",
     headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(s3DestinationsPlanRequest),
-  })
-}
-
-export const getListTemplateRoomsUrl = () => {
-  return `/api/v1/cluster/template-rooms`
-}
-
-/**
- * @summary Whether the cluster has room for each template's pods, read as the person once for all of
-them: `unknown` when the nodes or the pods cannot be read whole.
- */
-export const listTemplateRooms = async (
-  options?: Parameters<typeof zeaburFetch>[1],
-): Promise<TemplateRooms> => {
-  return zeaburFetch<TemplateRooms>(getListTemplateRoomsUrl(), {
-    ...options,
-    method: "GET",
   })
 }
 

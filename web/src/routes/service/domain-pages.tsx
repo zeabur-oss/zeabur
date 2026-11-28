@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { useId, useState } from "react"
 
-import { configMapsQuery, projectQuery, templateRoomsQuery } from "@/api/queries"
+import { configMapsQuery, projectQuery } from "@/api/queries"
 import type { Schemas } from "@/api/client"
 import { FormField } from "@/components/form-field"
 import { ReviewWord } from "@/components/plan/draft"
@@ -10,7 +10,6 @@ import type { PlanAsk } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import type { Translate } from "@/i18n"
 import { useProjectSummary } from "@/lib/project-name"
-import { useQuantityFormat } from "@/lib/quantity"
 import {
   defaultPage,
   PAGE_KEYS,
@@ -168,38 +167,18 @@ export default function DomainPagesDrawer({
   )
 }
 
-/** Says that review also deploys the Error pages template, and whether the cluster has room. */
+/** Says that review also deploys the Error pages template. */
 function NoServer({ shown }: { shown: boolean }) {
   const t = useT()
-  const room = useRoomSentence("error-pages", shown)
   if (!shown) return null
   return (
-    <Alert variant={room?.tight ? "warn" : "info"}>
+    <Alert variant="info">
       <AlertTitle>{t("domainPages.noServer")}</AlertTitle>
       <AlertDescription>
         <p>{t("domainPages.noServerHint")}</p>
-        {room && <p>{room.text}</p>}
       </AlertDescription>
     </Alert>
   )
-}
-
-/** Whether the cluster has room for the template; nothing when the server cannot tell. */
-function useRoomSentence(id: string, enabled: boolean) {
-  const t = useT()
-  const q = useQuantityFormat()
-  const room = useQuery({ ...templateRoomsQuery, enabled }).data?.items[id]
-  if (!room || room.fit === "unknown") return undefined
-  const tight = room.fit === "short"
-  if (room.resource === "cpu") {
-    return { tight, text: t("domainPages.tightCpu", q.cpu(room.need), q.cpu(room.free)) }
-  }
-  const use = q.memory(room.need)
-  const free = q.memory(room.free)
-  return {
-    tight,
-    text: tight ? t("domainPages.tightMemory", use, free) : t("domainPages.room", use, free),
-  }
 }
 
 function maintenanceHint(t: Translate, service: Service, route: Schemas.Route, host: string) {

@@ -23,7 +23,6 @@ import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
 import { type Translate, useT } from "@/i18n"
-import { useQuantityFormat } from "@/lib/quantity"
 import { outcomeHealth } from "@/model/cluster-backups"
 import { restoredName } from "@/model/database-restore"
 import {
@@ -171,27 +170,6 @@ function IntoField({
   )
 }
 
-function Room({ room }: { room: Schemas.RestoreRoom }) {
-  const t = useT()
-  const { memory, cpuRequest } = useQuantityFormat()
-  const need = t("clusterBackups.copy.amount", cpuRequest(room.needCpu), memory(room.needMemory))
-  const free = t("clusterBackups.copy.amount", cpuRequest(room.freeCpu), memory(room.freeMemory))
-  if (room.fit === "short")
-    return (
-      <Alert variant="warn" role="note">
-        <WarningIcon aria-hidden="true" />
-        <AlertDescription>{t("clusterBackups.copy.short", need, free)}</AlertDescription>
-      </Alert>
-    )
-  return (
-    <p className="type-meta text-muted-foreground">
-      {room.fit === "fits"
-        ? t("clusterBackups.copy.fits", need, free)
-        : t("clusterBackups.copy.roomUnknown", need)}
-    </p>
-  )
-}
-
 /** Names in a bounded, wrapping list. */
 function Names({ names }: { names: string[] }) {
   return (
@@ -257,7 +235,6 @@ export function CopyFacts({ copy }: { copy: Copy }) {
           {t("clusterBackups.copy.unread", copy.unread)}
         </p>
       ) : null}
-      {copy.room ? <Room room={copy.room} /> : null}
       {copy.sameName ? null : (
         <p className="type-meta text-muted-foreground">
           {t("clusterBackups.copy.webhooks", copy.source)}

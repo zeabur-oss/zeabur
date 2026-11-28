@@ -757,7 +757,7 @@ struct Planned {
 struct Computed {
     versions: BTreeMap<String, String>,
     writes: Vec<Planned>,
-    /// What a restore copies, before the backup's list and the room are read.
+    /// What a restore copies, before the backup's list is read.
     copy: Option<restore_copy::Copy>,
     /// The hostnames a move moves or an attach brings back, and the routes a move leaves.
     moved: (Vec<String>, Vec<String>),
@@ -1197,7 +1197,6 @@ async fn restore_writes(
         same_name: into.is_none(),
         inventory: None,
         unread: None,
-        room: None,
     });
     let object = value(&v::restore_object(namespace, name, backup, source, into))?;
     writes.extend(change("Restore", namespace, name, None, object));
@@ -1601,9 +1600,6 @@ pub(crate) async fn plan(
         match backup_download::resource_list(&state, cluster.as_ref(), backup).await {
             Ok(list) => copy.inventory = Some(v::inventory(&list, &copy.source)),
             Err(e) => copy.unread = Some(e.0.detail),
-        }
-        if !copy.same_name {
-            restore_copy::read_room(cluster.as_ref(), copy).await;
         }
     }
     let restoring = restores(&request);
