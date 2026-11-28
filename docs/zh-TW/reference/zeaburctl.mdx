@@ -28,7 +28,7 @@ zeaburctl ui
 zeaburctl ui --context production --no-browser
 zeaburctl doctor --context production --output json
 zeaburctl up ./site --project shop --service site
-zeaburctl connect shop/orders
+zeaburctl connect orders --project shop
 zeaburctl connect shop/api:8080
 zeaburctl components export cert-manager
 zeaburctl templates export miniflux --project shop --domain rss.example.com
@@ -104,42 +104,21 @@ zeaburctl up [資料夾] [--project <專案>] [--service <服務>]
 
 把資料夾上傳到叢集，開始建置。資料夾省略時用目前的資料夾。如果服務還不存在，指令會建立服務。專案必須已存在，指令不會建立專案。
 
-指令從叢集 `kube-public` Namespace 裡的 `zeabur-info` ConfigMap 讀到 Zeabur 開源版的網址和 Zeabur Identity 的位址，不用另外設定。登入叢集的人都能讀這個 ConfigMap，沒登入的人讀不到。要改用別的網址時，加上 `--server`，或設定環境變數 `ZEABUR_SERVER`。
+指令跟 `zeaburctl ui` 一樣，用你的 kubeconfig 經由 Kubernetes API 操作，和網頁用同一組 API，變更也一樣先檢查再套用，你不需要知道 registry 的位址。你的憑證不會送到別的地方，指令也做不到你的 kubeconfig 不能做的事。用 API 權杖做的 kubeconfig，只要權杖在專案是**開發者**就夠了，見[從自己的電腦或 CI 連線](../deploy/from-outside.mdx)。
 
-指令和網頁用同一組 API，變更也一樣先檢查再套用，你不需要知道 registry 的位址。
+### 需要什麼
 
-### 伺服器模式與本機模式
-
-指令開始時會印一行，告訴你這次用哪一種模式。
-
-| 模式 | 什麼時候用 | 資料夾怎麼送 |
-|---|---|---|
-| 伺服器模式 | kubeconfig 用 Zeabur Identity 的權杖登入，而且叢集有 `zeabur-info` | 交給叢集裡的 Zeabur 開源版，由 Zeabur 開源版推到 registry |
-| 本機模式 | 其他情況，例如管理員 kubeconfig、雲端服務的權杖、ServiceAccount 權杖，或叢集裡沒有 Zeabur 開源版伺服器 | 和 `zeaburctl ui` 一樣，在你的電腦上執行同樣的步驟，再從這台電腦推到 registry |
-
-本機模式用你 kubeconfig 的憑證直接連 Kubernetes API，憑證不會送到別的地方。拿管理員 kubeconfig，就能直接執行 `up`，不用另外設定。
-
-本機模式還需要：
-
-- 叢集裝了 Zeabur Builder。沒裝時，指令在上傳前就會停下來。沒裝時改用映像檔部署。
-- 連得到 registry。registry 在叢集裡時（例如 `zot.zot.svc:5000`），指令會經由 Kubernetes API 自動轉發連接埠，就像 `kubectl port-forward`。你要在 registry 的 Namespace 有 `get services`、`list endpointslices` 和 `create pods/portforward` 權限，也要能讀 registry 憑證的 CA ConfigMap。管理員都有這些權限，專案的 Developer 沒有。
-- 叢集有 `zeabur-info`。指令從這裡知道 registry 在哪裡。叢集裡沒有 Zeabur 開源版伺服器時，指令不能建立新服務，也不會自動轉發連接埠。
-
-### 登入與權限
-
-指令用 kubeconfig 的目前 context 登入，也可以用 `--context` 指定其他 context。兩種模式都用你的權限處理上傳和變更，無法做你沒有權限的事。
-
-指令只會把 Zeabur Identity 發的權杖送給叢集裡的 Zeabur 開源版。雲端服務的權杖（例如 GKE、EKS）、ServiceAccount 權杖、固定的權杖和用戶端憑證都不會送出，指令會改用本機模式。Zeabur 開源版也只接受 Zeabur Identity 發的權杖，其他權杖會當成沒登入。
-
-伺服器模式下，Zeabur 開源版的網址必須用 `https://`。只有在自己電腦上測試時（`localhost`、`127.0.0.1`、`::1`），才能用 `http://`。
+- 叢集裝了 Zeabur Builder。沒裝時，指令在上傳前就會停下來，請改用映像檔部署。
+- `kube-public` Namespace 裡有 Zeabur 開源版 chart 建立的 `zeabur-info` 設定檔。指令從這裡讀到 registry 的位址，登入叢集的人都能讀。沒有這個設定檔時，指令不能建立新服務，也不會轉發連接埠。
+- 連得到 registry。registry 在叢集裡時（例如 `zot.zot.svc:5000`），指令會經由 Kubernetes API 轉發連接埠，就像 `kubectl port-forward`。這需要 registry 所在 Namespace 的 `get services`、`list endpointslices` 和 `create pods/portforward` 權限，任何專案的開發者都有，見[建置用 registry 裡的映像檔](./permissions.mdx#建置用-registry-裡的映像檔)。registry 的憑證，指令用 Zeabur Builder 公開給所有登入者的 CA 來驗證。
 
 ### 選擇專案與服務
 
-在終端機執行時，如果沒給 `--project`，指令會讓你從清單選專案。如果沒給 `--service`，指令會詢問服務名稱，預設用資料夾名稱。
+沒給 `--project` 時，指令用 kubeconfig context 的 Namespace，並印出用的是哪個專案；權杖只在一個專案有角色時，API 權杖的 kubeconfig 就會設定它。context 沒有設定 Namespace 時，指令會在終端機讓你從清單選專案。如果沒給 `--service`，指令會詢問服務名稱，預設用資料夾名稱。
 
 如果服務不存在，指令會在建立前詢問一次。加上 `--yes` 可以跳過這次確認。
 
-在腳本或 CI 裡執行時，指令不會詢問。你必須用 `--project` 和 `--service` 指定專案與服務。如果服務不存在，指令會直接建立，不需要加 `--yes`。
+在腳本或 CI 裡執行時，指令不會詢問。你必須用 `--service` 指定服務；context 沒有設定 Namespace 時，也要用 `--project` 指定專案。如果服務不存在，指令會直接建立，不需要加 `--yes`。
 
 新服務的內容和網頁「上傳資料夾」建立的相同，包含 Build 和 Deployment。如果有給 `--port`，也會建立 Service，並設定 `PORT` 環境變數。如果沒給連接埠，服務就不接受連線。建置方式預設是 `railpack`，也可以用 `--method dockerfile` 改用 Dockerfile。
 
@@ -154,7 +133,7 @@ zeaburctl up [資料夾] [--project <專案>] [--service <服務>]
 上傳依序分成三步：
 
 1. 向 Build 要上傳權杖。這是一份變更，直接套用。
-2. 把壓縮檔推到 registry。伺服器模式由 Zeabur 開源版推，本機模式由這台電腦推。
+2. 從這台電腦把壓縮檔推到 registry。
 3. 把 digest 寫進 Build，開始建置。這也是一份變更，直接套用。
 
 這些變更和網頁上的一樣。執行指令就是你對套用的確認，指令不會再詢問。如果要建立新服務，建立服務的那份變更就已包含上傳權杖的要求。
@@ -163,8 +142,7 @@ zeaburctl up [資料夾] [--project <專案>] [--service <服務>]
 
 | 選項 | 預設與用途 |
 |---|---|
-| `--server <位址>` | 伺服器模式用的網址，預設讀 `zeabur-info` 裡的網址。要用別的網址時指定，例如 `https://zeabur.example.com`，也可以用環境變數 `ZEABUR_SERVER` |
-| `--project <專案>` | 服務所在的既有專案。省略時在終端機從清單選擇，腳本與 CI 必填 |
+| `--project <專案>` | 服務所在的既有專案，預設是 kubeconfig context 的 Namespace。context 沒有設定時，在終端機從清單選擇，腳本與 CI 必填 |
 | `--service <服務>` | 服務名稱。省略時在終端機詢問，預設用資料夾名稱，腳本與 CI 必填 |
 | `--context <名稱>` | 預設用 kubeconfig 的目前 context |
 | `--method railpack\|dockerfile` | 新服務的建置方式，預設是 `railpack` |
@@ -174,10 +152,12 @@ zeaburctl up [資料夾] [--project <專案>] [--service <服務>]
 ## `connect`
 
 ```sh
-zeaburctl connect <project>/<name>[:<port>] [--port <port>] [--context <name>]
+zeaburctl connect [<project>/]<name>[:<port>] [--project <project>] [--port <port>] [--context <name>]
 ```
 
 經由 kube-apiserver 把 `127.0.0.1` 上的一個連接埠轉發到資料庫或服務，就像 `kubectl port-forward`。指令會一直執行，按 Ctrl-C 才停止。
+
+專案依序取目標裡 `/` 前面的名稱、`--project`，最後是 kubeconfig context 的 Namespace。目標和 `--project` 寫的專案不同時，指令會停下來。`zeaburctl connect orders --project shop` 和 `zeaburctl connect shop/orders` 連到同一個資料庫。
 
 指令會先在專案的資料庫裡找 `<name>`。找到資料庫時，印出連線字串，每種引擎都能用。找不到時，就把 `<name>` 當成服務，印出本機位址，例如 `127.0.0.1:52341`。服務要透過它的 Kubernetes Service 的連接埠連線；連接埠不只一個時，在名稱後面加上要連的那個，例如 `shop/api:8080`。沒加的話，指令會列出所有連接埠後停止。
 
@@ -185,6 +165,7 @@ zeaburctl connect <project>/<name>[:<port>] [--port <port>] [--context <name>]
 
 | 選項 | 預設與用途 |
 |---|---|
+| `--project` | kubeconfig context 的 Namespace |
 | `--port` | 一個空著的連接埠。想每次都用同一個本機連接埠時再指定 |
 | `--context` | kubeconfig 的目前 context |
 

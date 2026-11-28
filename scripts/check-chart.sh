@@ -56,7 +56,7 @@ for values in "$chart"/ci/*-values.yaml; do
   # and metrics readers.
   expect "$name" "$out" '[select(.kind == "ClusterRoleBinding")] | length' 0
   expect "$name" "$out" '[select(.kind == "ClusterRole") | .metadata.name] | sort | join(",")' \
-    zeabur-gateway-routes-reader,zeabur-member,zeabur-project-builds-read,zeabur-project-builds-write,zeabur-project-developer,zeabur-project-developer-rules,zeabur-project-viewer,zeabur-project-viewer-rules,zeabur-proxy-logs-reader,zeabur-proxy-metrics-reader
+    zeabur-gateway-routes-reader,zeabur-member,zeabur-project-builds-read,zeabur-project-builds-write,zeabur-project-developer,zeabur-project-developer-rules,zeabur-project-viewer,zeabur-project-viewer-rules,zeabur-proxy-logs-reader,zeabur-proxy-metrics-reader,zeabur-registry-client
   # A project role is exactly what its own label selects: nothing else of the chart's widens it.
   expect "$name" "$out" \
     '[select(.kind == "ClusterRole" and .aggregationRule) | .metadata.name + "=" + (.aggregationRule.clusterRoleSelectors[].matchLabels | keys | join("+")) + ((.rules // []) | length | tostring)] | join(",")' \
@@ -93,10 +93,11 @@ for values in "$chart"/ci/*-values.yaml; do
     "zeabur-project-namespace,Fail,namespaces/UPDATE,zeabur-system-hosts,Fail,ingresses/CREATE/UPDATE,httproutes/CREATE/UPDATE"
   expect "$name" "$out" 'select(.kind == "ValidatingAdmissionPolicyBinding") | [.spec.policyName, (.spec.validationActions | join("/")), .spec.paramRef.namespace // ""] | join(",")' \
     "zeabur-project-namespace,Deny,,zeabur-system-hosts,Deny,zeabur,zeabur-system-hosts,Deny,zeabur-identity"
-  # Secret values and shells in containers belong to developers only.
+  # Secret values and shells in containers belong to developers only. The registry client
+  # forwards a port, and Zeabur binds it in the build registry's namespace only.
   expect "$name" "$out" \
     '[select(.kind == "ClusterRole") | select(.rules | any_c(.resources | any_c(test("^(secrets|pods/(exec|attach|portforward|ephemeralcontainers))$")))) | .metadata.name] | join(",")' \
-    zeabur-project-developer-rules
+    zeabur-project-developer-rules,zeabur-registry-client
   expect "$name" "$out" \
     "[select(.kind == \"RoleBinding\") | (.metadata.namespace + \"/\" + .metadata.name + \">\" + .roleRef.name) as \$b | .subjects[] | select(.kind == \"ServiceAccount\") | \$b + \">\" + .namespace + \"/\" + .name] | join(\",\")" \
     "zeabur/zeabur-catalog>zeabur-catalog>zeabur/zeabur,$terminals/zeabur-terminals>zeabur-terminals>zeabur/zeabur"

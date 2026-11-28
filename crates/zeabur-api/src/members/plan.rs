@@ -21,9 +21,11 @@ use serde_json::{Value, json};
 use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::ServiceAccount;
-use zeabur_kube::k8s_openapi::api::rbac::v1::ClusterRoleBinding;
+use zeabur_kube::k8s_openapi::api::rbac::v1::{ClusterRoleBinding, RoleBinding};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
-use zeabur_kube::{Cluster, ObjectTarget, Preconditions, ResourceRef, WriteBody, WriteRequest};
+use zeabur_kube::{
+    Cluster, DynamicObject, ObjectTarget, Preconditions, ResourceRef, WriteBody, WriteRequest,
+};
 use zeabur_plan::api_token;
 
 use super::USER_PREFIX;
@@ -40,7 +42,7 @@ use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, PlanKey, TokenError};
 use crate::projects::writes::token_problem;
-use crate::settings::IdentitySettings;
+use crate::settings::{IdentitySettings, ServiceAddress};
 
 /// Sealed members' plans start with this, so a project's token never opens as one, nor the
 /// other way round.
@@ -307,10 +309,34 @@ impl Computed {
         }
     }
 
-    /// The project bindings that take `current` to `wanted`, deletions first.
-    fn bindings(&mut self, holder: &Holder, current: &[Binding], wanted: &[ProjectGrant]) {
+    /// The project bindings that take `current` to `wanted`, and the binding in the build
+    /// registry's namespace while `wanted` holds a Developer role, deletions first.
+    fn bindings(
+        &mut self,
+        holder: &Holder,
+        current: &[Binding],
+        wanted: &[ProjectGrant],
+        registry: Option<&Registry>,
+    ) {
         let name = holder.binding_name();
-        for step in access::steps(holder, current, wanted) {
+        let (deletes, creates): (Vec<Step>, Vec<Step>) = access::steps(holder, current, wanted)
+            .into_iter()
+            .partition(|step| matches!(step, Step::Delete(_)));
+        let registry = registry.map(|registry| {
+            let target = access::target(
+                "RoleBinding",
+                &registry.namespace,
+                &holder.registry_binding_name(),
+            );
+            (registry, target)
+        });
+        if let Some((registry, target)) = &registry
+            && let Some(held) = &registry.held
+            && !access::reaches_registry(wanted)
+        {
+            self.delete(target.clone(), held.metadata.uid.clone(), Some(plain(held)));
+        }
+        for step in deletes.into_iter().chain(creates) {
             match step {
                 Step::Delete(binding) => {
                     let before = binding
@@ -327,6 +353,15 @@ impl Computed {
                     plain(access::role_binding(&grant.project, holder, grant.role)),
                 ),
             }
+        }
+        if let Some((registry, target)) = registry
+            && registry.held.is_none()
+            && access::reaches_registry(wanted)
+        {
+            self.create(
+                target,
+                plain(access::registry_binding(&registry.namespace, holder)),
+            );
         }
     }
 
@@ -376,22 +411,77 @@ async fn baseline_of(
         "clusterrolebindings",
         "ClusterRoleBinding",
     );
-    let name = holder.binding_name();
-    match cluster.get_object(&resource, None, &name).await {
-        Ok(found) => Ok(found.and_then(|o| o.try_parse().ok())),
+    let found = get(cluster, &resource, None, &holder.binding_name()).await?;
+    Ok(found.and_then(|o| o.try_parse().ok()))
+}
+
+/// The object `name`, `None` when it is missing.
+async fn get(
+    cluster: &dyn Cluster,
+    resource: &ResourceRef,
+    namespace: Option<&str>,
+    name: &str,
+) -> Result<Option<DynamicObject>, ApiError> {
+    match cluster.get_object(resource, namespace, name).await {
+        Ok(found) => Ok(found),
         Err(error) if error.code() == Some(404) => Ok(None),
         Err(error) => Err(read_problem(
             error,
-            &format!("ClusterRoleBinding {name}"),
+            &format!("{} {name}", resource.kind),
             Denied {
                 verb: "get".to_owned(),
-                group: RBAC_GROUP.to_owned(),
-                resource: "clusterrolebindings".to_owned(),
-                name: Some(name.clone()),
-                namespace: None,
+                group: resource.group.clone(),
+                resource: resource.resource.clone(),
+                name: Some(name.to_owned()),
+                namespace: namespace.map(str::to_owned),
             },
         )),
     }
+}
+
+/// The build registry's namespace, and the holder's binding there.
+#[derive(Debug, Clone)]
+struct Registry {
+    namespace: String,
+    held: Option<RoleBinding>,
+}
+
+/// The namespace of the build registry (`builds.registry`) when it is a Service whose namespace
+/// exists. An external registry, or one not installed yet, gets no binding.
+async fn registry_namespace(
+    cluster: &dyn Cluster,
+    registry: Option<&str>,
+) -> Result<Option<String>, ApiError> {
+    let Some(service) = registry.and_then(ServiceAddress::parse) else {
+        return Ok(None);
+    };
+    let namespaces = ResourceRef::new("", "v1", "namespaces", "Namespace");
+    let found = get(cluster, &namespaces, None, &service.namespace).await?;
+    Ok(found.map(|_| service.namespace))
+}
+
+/// `holder`'s binding in the build registry's `namespace`.
+async fn registry_of(
+    cluster: &dyn Cluster,
+    holder: &Holder,
+    namespace: Option<&str>,
+) -> Result<Option<Registry>, ApiError> {
+    let Some(namespace) = namespace else {
+        return Ok(None);
+    };
+    let resource = ResourceRef::new(RBAC_GROUP, "v1", "rolebindings", "RoleBinding");
+    let held = get(
+        cluster,
+        &resource,
+        Some(namespace),
+        &holder.registry_binding_name(),
+    )
+    .await?
+    .and_then(|o| o.try_parse().ok());
+    Ok(Some(Registry {
+        namespace: namespace.to_owned(),
+        held,
+    }))
 }
 
 fn typed_user(user: &Value) -> Result<Object<UserSpec>, ApiError> {
@@ -416,6 +506,8 @@ async fn compute(
     change: &MemberChange,
 ) -> Result<Computed, ApiError> {
     let identity = &state.settings.identity;
+    let registry = registry_namespace(cluster, state.settings.builds.registry.as_deref()).await?;
+    let registry = registry.as_deref();
     match change {
         MemberChange::Invite {
             username,
@@ -427,6 +519,7 @@ async fn compute(
             invite(
                 identity,
                 cluster,
+                registry,
                 username.trim(),
                 display_name.as_deref(),
                 *admin,
@@ -440,16 +533,24 @@ async fn compute(
             projects,
         } => {
             let projects = wanted_projects(*admin, projects, identity.project_roles)?;
-            access_change(identity, cluster, username, *admin, &projects).await
+            access_change(identity, cluster, registry, username, *admin, &projects).await
         }
-        MemberChange::Remove { username } => remove(identity, cluster, username).await,
+        MemberChange::Remove { username } => remove(identity, cluster, registry, username).await,
         MemberChange::CreateToken {
             name,
             projects,
             expiration_seconds,
         } => {
             let projects = token_projects(identity, projects)?;
-            create_token(cluster, person, name, &projects, *expiration_seconds).await
+            create_token(
+                cluster,
+                registry,
+                person,
+                name,
+                &projects,
+                *expiration_seconds,
+            )
+            .await
         }
         MemberChange::TokenAccess { name, projects } => {
             let projects = token_projects(identity, projects)?;
@@ -459,19 +560,20 @@ async fn compute(
                 key(&account_target(name)),
                 account.metadata.uid.unwrap_or_default(),
             );
-            token_access(cluster, &mut computed, name, &projects).await?;
+            token_access(cluster, registry, &mut computed, name, &projects).await?;
             Ok(computed)
         }
         MemberChange::RenewToken {
             name,
             expiration_seconds,
         } => renew_token(cluster, name, *expiration_seconds).await,
-        MemberChange::DeleteToken { name } => delete_token(cluster, name).await,
+        MemberChange::DeleteToken { name } => delete_token(cluster, registry, name).await,
     }
 }
 
 async fn create_token(
     cluster: &dyn Cluster,
+    registry: Option<&str>,
     person: &str,
     name: &str,
     projects: &[ProjectGrant],
@@ -490,7 +592,7 @@ async fn create_token(
     let account = api_token::service_account(name, person);
     let mut computed = Computed::default();
     computed.create(account_target(name), plain(&account));
-    token_access(cluster, &mut computed, name, projects).await?;
+    token_access(cluster, registry, &mut computed, name, projects).await?;
     computed.ops.push(Op::IssueToken {
         name: name.to_owned(),
         seconds,
@@ -530,12 +632,17 @@ async fn renew_token(
     Ok(computed)
 }
 
-async fn delete_token(cluster: &dyn Cluster, name: &str) -> Result<Computed, ApiError> {
+async fn delete_token(
+    cluster: &dyn Cluster,
+    registry: Option<&str>,
+    name: &str,
+) -> Result<Computed, ApiError> {
     let account = tokens::existing(cluster, name).await?;
     let holder = Holder::token(name);
     let mut computed = Computed::default();
     let current = access::bindings_for(cluster, &holder).await?;
-    computed.bindings(&holder, &current, &[]);
+    let registry = registry_of(cluster, &holder, registry).await?;
+    computed.bindings(&holder, &current, &[], registry.as_ref());
     if let Some(held) = baseline_of(cluster, &holder).await? {
         computed.delete(
             access::target("ClusterRoleBinding", "", &holder.binding_name()),
@@ -579,6 +686,7 @@ fn token_projects(
 /// The token's bindings as wanted: the baseline and a role in each of `projects`.
 async fn token_access(
     cluster: &dyn Cluster,
+    registry: Option<&str>,
     computed: &mut Computed,
     name: &str,
     projects: &[ProjectGrant],
@@ -586,7 +694,8 @@ async fn token_access(
     let holder = Holder::token(name);
     let current = access::bindings_for(cluster, &holder).await?;
     let held = baseline_of(cluster, &holder).await?;
-    computed.bindings(&holder, &current, projects);
+    let registry = registry_of(cluster, &holder, registry).await?;
+    computed.bindings(&holder, &current, projects, registry.as_ref());
     computed.baseline(&holder, held.as_ref());
     Ok(())
 }
@@ -594,6 +703,7 @@ async fn token_access(
 async fn invite(
     identity: &IdentitySettings,
     cluster: &dyn Cluster,
+    registry: Option<&str>,
     username: &str,
     display_name: Option<&str>,
     admin: bool,
@@ -639,8 +749,9 @@ async fn invite(
             let holder = Holder::member(username);
             let current = access::bindings_for(cluster, &holder).await?;
             let held = baseline_of(cluster, &holder).await?;
+            let registry = registry_of(cluster, &holder, registry).await?;
             computed.baseline(&holder, held.as_ref());
-            computed.bindings(&holder, &current, projects);
+            computed.bindings(&holder, &current, projects, registry.as_ref());
         }
     }
     computed.ops.push(Op::Invite);
@@ -651,6 +762,7 @@ async fn invite(
 async fn access_change(
     identity: &IdentitySettings,
     cluster: &dyn Cluster,
+    registry: Option<&str>,
     username: &str,
     admin: bool,
     projects: &[ProjectGrant],
@@ -677,8 +789,9 @@ async fn access_change(
         let holder = Holder::member(username);
         let current = access::bindings_for(cluster, &holder).await?;
         let held = baseline_of(cluster, &holder).await?;
+        let registry = registry_of(cluster, &holder, registry).await?;
         computed.baseline(&holder, held.as_ref());
-        computed.bindings(&holder, &current, projects);
+        computed.bindings(&holder, &current, projects, registry.as_ref());
     }
     if admin {
         computed.patch_admin(namespace, &user, &typed, true);
@@ -689,6 +802,7 @@ async fn access_change(
 async fn remove(
     identity: &IdentitySettings,
     cluster: &dyn Cluster,
+    registry: Option<&str>,
     username: &str,
 ) -> Result<Computed, ApiError> {
     let namespace = identity.namespace.as_str();
@@ -707,7 +821,8 @@ async fn remove(
     let mut computed = Computed::default();
     let holder = Holder::member(username);
     let current = access::bindings_for(cluster, &holder).await?;
-    computed.bindings(&holder, &current, &[]);
+    let registry = registry_of(cluster, &holder, registry).await?;
+    computed.bindings(&holder, &current, &[], registry.as_ref());
     if let Some(held) = baseline_of(cluster, &holder).await? {
         computed.delete(
             access::target("ClusterRoleBinding", "", &holder.binding_name()),
@@ -1176,6 +1291,7 @@ mod tests {
                 grant("shop", ProjectRole::Developer),
                 grant("blog", ProjectRole::Developer),
             ],
+            None,
         );
         assert_eq!(
             listed(&computed),
@@ -1206,6 +1322,67 @@ mod tests {
                 .contains("zeabur-project-developer")
         );
         assert_eq!(writes[0].namespace, None);
+    }
+
+    fn registry(held: bool) -> Registry {
+        Registry {
+            namespace: "zot".to_owned(),
+            held: held.then(|| access::registry_binding("zot", &Holder::member("bob"))),
+        }
+    }
+
+    /// A Developer anywhere may forward a port to the build registry, with a binding in its
+    /// namespace only; a holder who is no longer a Developer loses it before anything is created.
+    #[test]
+    fn a_developer_gets_a_binding_in_the_registry_namespace_and_loses_it_with_the_role() {
+        let bob = Holder::member("bob");
+        let mut computed = Computed::default();
+        computed.bindings(
+            &bob,
+            &[],
+            &[grant("shop", ProjectRole::Developer)],
+            Some(&registry(false)),
+        );
+        assert!(
+            listed(&computed)
+                .contains(&"create RoleBinding/zot/zeabur-registry-zeabur-member-bob".to_owned())
+        );
+        let writes = writes_of(&computed, "zeabur-identity", "bob", 0);
+        let made = writes
+            .iter()
+            .find(|w| w.namespace.as_deref() == Some("zot"))
+            .and_then(|w| w.after_yaml.as_deref())
+            .unwrap();
+        assert!(made.contains(access::REGISTRY_ROLE) && made.contains("zeabur:bob"));
+
+        let mut computed = Computed::default();
+        computed.bindings(
+            &bob,
+            &[binding("shop", ProjectRole::Developer)],
+            &[grant("shop", ProjectRole::Viewer)],
+            Some(&registry(true)),
+        );
+        let ops = listed(&computed);
+        assert_eq!(
+            ops.first().map(String::as_str),
+            Some("delete RoleBinding/zot/zeabur-registry-zeabur-member-bob")
+        );
+        assert!(
+            !ops.iter()
+                .any(|op| op.starts_with("create RoleBinding/zot/"))
+        );
+
+        for (wanted, held) in [
+            (vec![grant("shop", ProjectRole::Viewer)], false),
+            (vec![grant("shop", ProjectRole::Developer)], true),
+        ] {
+            let mut computed = Computed::default();
+            computed.bindings(&bob, &[], &wanted, Some(&registry(held)));
+            assert!(
+                !listed(&computed).iter().any(|op| op.contains("/zot/")),
+                "{wanted:?}"
+            );
+        }
     }
 
     #[test]

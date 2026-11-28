@@ -62,13 +62,13 @@ description: 将电脑上的文件夹或 .zip 文件交给 Zeabur Builder 构建
 
 ## 用 zeaburctl 上传
 
-在终端和脚本中可以使用 [`zeaburctl up`](../reference/zeaburctl.mdx#up)，无需知道 registry 或 Zeabur 开源版的地址。使用 Zeabur Identity 登录时，文件夹会交给集群中的 Zeabur 开源版。使用管理员 kubeconfig 等其他凭证时，命令会在你的电脑上运行相同的步骤，凭证不会离开你的电脑。
+在终端和脚本中可以使用 [`zeaburctl up`](../reference/zeaburctl.mdx#up)，无需知道 registry 或 Zeabur 开源版的地址。命令用你的 kubeconfig 通过 Kubernetes API 操作，从你的电脑推送文件夹。凭证不会离开你的电脑，在项目中是**开发者**就够了。
 
 ```sh
 zeaburctl up ./site --project shop --service site
 ```
 
-如果服务不存在，命令会创建服务。在脚本或 CI 中，必须同时填写 `--project` 和 `--service`，且项目必须已存在。
+如果服务不存在，命令会创建服务。在脚本或 CI 中必须填写 `--service`；kubeconfig context 没有设置 Namespace 时，还要填写 `--project`。项目必须已存在。要用 API 令牌从 GitHub Actions 上传，见[从自己的电脑或 CI 连接](./from-outside.mdx#从-ci-连接)。
 
 ## 确认结果
 

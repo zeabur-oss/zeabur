@@ -314,6 +314,47 @@ pub fn parse_service_port(text: &str) -> Result<ServicePort, String> {
     })
 }
 
+/// A Service port, from its in-cluster address, such as the build registry `zot.zot.svc:5000`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServiceAddress {
+    /// The Service's namespace.
+    pub namespace: String,
+    /// The Service's name.
+    pub name: String,
+    /// The Service port.
+    pub port: u16,
+}
+
+impl ServiceAddress {
+    /// `<name>.<namespace>.svc[.cluster.local][:port]` (port 443 when left out); `None` for
+    /// another address.
+    #[must_use]
+    pub fn parse(address: &str) -> Option<Self> {
+        let address = address.strip_prefix("https://").unwrap_or(address);
+        let (host, port) = match address.rsplit_once(':') {
+            Some((host, port)) => (host, port.parse().ok()?),
+            None => (address, 443),
+        };
+        let host = host.strip_suffix(".cluster.local").unwrap_or(host);
+        let mut labels = host.strip_suffix(".svc")?.split('.');
+        let (Some(name), Some(namespace), None) = (labels.next(), labels.next(), labels.next())
+        else {
+            return None;
+        };
+        (!name.is_empty() && !namespace.is_empty()).then(|| Self {
+            namespace: namespace.to_owned(),
+            name: name.to_owned(),
+            port,
+        })
+    }
+}
+
+impl std::fmt::Display for ServiceAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}:{}", self.namespace, self.name, self.port)
+    }
+}
+
 /// The most characters a cluster's name may have.
 pub const CLUSTER_NAME_MAX: usize = 63;
 
@@ -900,6 +941,33 @@ pub(crate) mod store {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_an_in_cluster_service_address_is_forwarded() {
+        let zot = ServiceAddress {
+            namespace: "zot".to_owned(),
+            name: "zot".to_owned(),
+            port: 5000,
+        };
+        assert_eq!(ServiceAddress::parse("zot.zot.svc:5000"), Some(zot.clone()));
+        assert_eq!(
+            ServiceAddress::parse("https://zot.zot.svc.cluster.local:5000"),
+            Some(zot)
+        );
+        assert_eq!(
+            ServiceAddress::parse("registry.reg.svc").map(|s| s.port),
+            Some(443)
+        );
+        for other in [
+            "registry.example.com:5000",
+            "ghcr.io",
+            "a.b.c.svc:5000",
+            "zot.svc:5000",
+            "127.0.0.1:5000",
+        ] {
+            assert_eq!(ServiceAddress::parse(other), None, "{other}");
+        }
+    }
 
     #[test]
     fn the_form_may_post_to_github_s_origin_only() {

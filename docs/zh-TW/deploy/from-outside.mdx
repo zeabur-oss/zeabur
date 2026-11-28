@@ -1,0 +1,120 @@
+---
+title: 從自己的電腦或 CI 連線
+description: 用自己的帳號登入，在電腦上用 psql 或 DBeaver 開資料庫、上傳資料夾；用 API 權杖從 GitHub Actions 上傳。
+---
+
+`zeaburctl connect` 和 `zeaburctl up` 跟 kubectl 一樣用 kubeconfig 操作叢集，只經由 TCP 6443 上的 kube-apiserver 連進去，所以資料庫和建置用的 registry 都不需要公開位址。能做的事也只限於 kubeconfig 的角色。
+
+- **在自己的電腦上**，用自己的 Zeabur 開源版帳號經由 Zeabur Identity 登入，不需要找管理員。
+- **在 CI 裡**沒有人能登入，所以改用管理員建立的 [API 權杖](../reference/api-tokens.mdx)。
+
+範例用專案 `shop`、PostgreSQL 資料庫 `orders` 和服務 `web`。
+
+## 開始前
+
+- 電腦上已經裝好 [zeaburctl](../reference/zeaburctl.mdx)。
+- 你或權杖在 `shop` 是**開發者**。**檢視者**不能連線，也不能上傳。
+- 你的電腦或 CI runner 連得到 kube-apiserver 的 TCP 6443。
+- 要上傳資料夾的話，叢集裡要裝好 Zeabur Builder。
+
+## 從自己的電腦連線
+
+### 用 kubectl 登入
+
+1. 照 Zeabur Identity 文件的[設定你電腦上的 kubectl](https://oss.zeabur.com/zh-TW/docs/identity/get-started/quickstart#設定你電腦上的-kubectl)，裝好 kubelogin（`kubectl oidc-login`），並在 kubeconfig 加上你 Zeabur Identity 帳號的 context。叢集的 `server` 要填 kube-apiserver 在 6443 連接埠的位址，怎麼找見[找出 API 位址](../reference/api-tokens.mdx#找出-api-位址)。
+2. 讓 kubeconfig 一開始就在你的專案，之後不加 `--project` 時 zeaburctl 也用它：
+
+   ```sh
+   kubectl config set-context --current --namespace shop
+   ```
+
+3. 確認自己能做什麼。第一次執行時，瀏覽器會打開 Zeabur Identity 的登入頁。
+
+   ```sh
+   kubectl auth can-i --list -n shop
+   ```
+
+   開發者會在清單裡看到 `pods/portforward` 和 `create`。kubelogin 會讓你維持登入一段時間，之後的指令不會每次都要用通行金鑰。見[用 kubectl 操作](../reference/permissions.mdx#用-kubectl-操作)。
+
+### 開資料庫
+
+```sh
+zeaburctl connect orders --port 15432
+```
+
+指令會把 `127.0.0.1:15432` 接到資料庫，並印出連線字串：
+
+```text
+Forwarding 127.0.0.1:15432 to orders in shop. Press Ctrl-C to stop.
+postgresql://app:<password>@127.0.0.1:15432/app
+```
+
+使用期間讓指令一直執行，用完按 Ctrl-C 結束，叢集不會有任何變動。加上 `--port`，每次都用同一個本機連接埠，用戶端裡存好的連線就能繼續用；不加的話，指令會挑一個空著的連接埠。
+
+- **psql**：把連線字串加上引號交給 `psql`，例如 `psql 'postgresql://app:<password>@127.0.0.1:15432/app'`。
+- **DBeaver**：新增 PostgreSQL 連線，主機填 `127.0.0.1`，連接埠填 `15432`，資料庫、使用者名稱和密碼照連線字串填。
+
+每種引擎都會印出連線字串：MySQL 和 MariaDB 是 `mysql://`，MongoDB 是 `mongodb://`，Dragonfly 是 `redis://`。服務也能連，`zeaburctl connect web:8080` 會印出 `127.0.0.1:52341` 這樣的本機位址。細節見 [`connect`](../reference/zeaburctl.mdx#connect)。
+
+### 上傳資料夾
+
+```sh
+zeaburctl up --service web
+```
+
+`zeaburctl up` 會打包目前的資料夾，經由 kube-apiserver 送到建置用的 registry，再開始建置服務。`web` 不存在時，指令會先問你，再建立它。新服務要加上 `--port 8080`，告訴它應用程式監聽的連接埠。資料夾上傳完、建置開始後，指令就結束，建置完成時服務會部署新的建置結果。細節見 [`up`](../reference/zeaburctl.mdx#up)。
+
+## 從 CI 連線
+
+1. 請管理員建立在 `shop` 是**開發者**的 API 權杖，再照[把權杖做成 kubeconfig](../reference/api-tokens.mdx#把權杖做成-kubeconfig) 做成 kubeconfig。權杖只在一個專案有角色時，kubeconfig 一開始就在那個專案；不然每個指令都要加 `--project shop`。
+2. 把 kubeconfig 存成 repository 的 secret，不要放進 repository：
+
+   ```sh
+   gh secret set KUBECONFIG_DATA < deploy-shop.yaml
+   ```
+
+3. 加一個 workflow，例如 `.github/workflows/deploy.yml`：
+
+   ```yaml
+   name: Deploy
+   on:
+     push:
+       branches: [main]
+   jobs:
+     deploy:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v4
+         - name: Install zeaburctl
+           env:
+             GH_TOKEN: ${{ github.token }}
+           run: |
+             gh release download --repo zeabur-oss/zeabur \
+               --pattern 'zeaburctl-v*-linux-amd64.tar.gz' --pattern SHA256SUMS
+             sha256sum --check --ignore-missing SHA256SUMS
+             tar -xzf zeaburctl-v*-linux-amd64.tar.gz zeaburctl
+             sudo install zeaburctl /usr/local/bin/
+         - name: Upload
+           env:
+             KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}
+           run: |
+             export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+             (umask 077; printf '%s' "$KUBECONFIG_DATA" > "$KUBECONFIG")
+             zeaburctl up . --project shop --service web --port 8080
+   ```
+
+`gh release download` 不指定 tag 時會下載最新版。要固定版本，就在 `download` 後面加上 tag，例如 `v0.3.3`。要一併驗證簽章，見[發行檔與驗證](../reference/releases.mdx)。
+
+在 CI 裡指令不會發問，所以一定要給 `--service`；kubeconfig 一開始不在某個專案時，也要給 `--project`。`--port` 只對新服務有用，新服務沒有設定的話，就不接受連線。服務已經存在時，指令不改它的建置設定。
+
+## 連不上時
+
+| 看到什麼 | 原因與處理 |
+|---|---|
+| 指令等了一陣子，接著說連不到叢集 | 這台機器連不到 TCP 6443。請在伺服器的防火牆或雲端供應商的安全群組開放這個連接埠。GitHub 代管的 runner 沒有固定位址，可能要改用自架 runner，或用 VPN 連到伺服器。 |
+| 錯誤說憑證對這個名稱或位址無效 | API 憑證沒有涵蓋 `server` 裡的位址。把位址加到 K3s 或 RKE2 設定檔的 `tls-san`（Zeatend 是 `host.tlsSan`），再重新啟動 K3s 或 RKE2。 |
+| `not allowed to forward a port to zot/zot:5000` | 你或權杖在任何專案都不是**開發者**，或是建置用的 registry 在上次儲存權限之後才安裝。請管理員[變更權限](../cluster/members.mdx#變更權限)，把你的帳號或權杖的權限再儲存一次。見[建置用 registry 裡的映像檔](../reference/permissions.mdx#建置用-registry-裡的映像檔)。 |
+| `not allowed to forward a port to shop/…` | 你或權杖在這個專案是**檢視者**。請管理員改成**開發者**。 |
+| `Name the project with --project` | kubeconfig 一開始不在任何專案。請加上 `--project`，或執行 `kubectl config set-context --current --namespace <專案>`。 |
+| `Zeabur Builder is not installed in this cluster` | 安裝 Zeabur Builder，或改成部署映像檔，不上傳資料夾。 |
+| `401 Unauthorized` | 登入或權杖過期了。在自己的電腦上，再執行一次指令並重新登入；在 CI 裡，更新權杖後重新存一次 kubeconfig。 |

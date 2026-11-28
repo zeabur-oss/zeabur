@@ -13,13 +13,6 @@
 //! Every request but the health check passes [`zeabur_core::guard`] first: its `Host` must be
 //! the public URL's, and a request that changes something must come from Zeabur's own page.
 //!
-//! **Command line.** A request with no session cookie may carry `Authorization: Bearer <token>`,
-//! the person's own token for kube-apiserver (`zeaburctl up`). It must be a JWT from Zeabur
-//! Identity: Zeabur reads its `iss` and does not use another token. Zeabur acts with it as with
-//! a session's, so kube-apiserver checks the signature and decides what it may do. It is not
-//! kept, and a tools pod or Zeabur Proxy never gets it. The guard still applies, so such a client
-//! sends `Origin` and the custom header.
-//!
 //! **Idle sessions.** A request with the header [`BACKGROUND`] does not count as activity (see
 //! [`Activity`]): the interface sends it on requests it makes on its own after a minute without
 //! input, so an open tab does not keep a session alive.
@@ -37,7 +30,6 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, Uri, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use secrecy::ExposeSecret as _;
 use tower_http::compression::CompressionLayer;
 use tower_http::compression::predicate::{Predicate, SizeAbove};
 use zeabur_api::ApiError;
@@ -79,8 +71,6 @@ impl std::fmt::Debug for Connection {
 /// What the sign-in routes and the API share.
 pub(crate) struct Auth {
     pub(crate) public: BaseUrl,
-    /// The Zeabur Identity issuer. A bearer token must name it as `iss`.
-    pub(crate) issuer: BaseUrl,
     pub(crate) oauth: Arc<OAuthClient>,
     pub(crate) sessions: Arc<Sessions<Connection>>,
     pub(crate) connect: Bind<Connection>,
@@ -102,8 +92,6 @@ impl std::fmt::Debug for Auth {
 #[derive(Clone)]
 enum Signed {
     In(Credentials<Connection>),
-    /// A bearer token the request presented itself.
-    Token(Connection),
     IssuerDown,
 }
 
@@ -283,22 +271,12 @@ async fn session(State(auth): State<Arc<Auth>>, mut request: Request, next: Next
             Lookup::SignedOut => None,
         }
     } else {
-        bearer(request.headers())
-            .filter(|token| zeabur_kube::issued_by(token.expose_secret(), auth.issuer.as_str()))
-            .and_then(|token| (auth.connect)(token).ok().map(Signed::Token))
+        None
     };
     if let Some(signed) = signed {
         request.extensions_mut().insert(signed);
     }
     next.run(request).await
-}
-
-/// The token of `Authorization: Bearer <token>`.
-fn bearer(headers: &HeaderMap) -> Option<secrecy::SecretString> {
-    let value = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
-    let (scheme, token) = value.split_once(' ')?;
-    (scheme.eq_ignore_ascii_case("bearer") && !token.trim().is_empty())
-        .then(|| secrecy::SecretString::from(token.trim().to_owned()))
 }
 
 /// The API's view of sessions: every request with the session's token.
@@ -318,7 +296,6 @@ fn signed_out() -> Box<Problem> {
 fn connection(parts: &Parts) -> Result<&Connection, Box<Problem>> {
     match parts.extensions.get::<Signed>() {
         Some(Signed::In(credentials)) => Ok(&credentials.base.value),
-        Some(Signed::Token(connection)) => Ok(connection),
         Some(Signed::IssuerDown) => {
             let mut problem = Problem::new(
                 Kind::Unavailable,
@@ -334,11 +311,11 @@ fn connection(parts: &Parts) -> Result<&Connection, Box<Problem>> {
     }
 }
 
-/// The session's credentials; a bare token has none.
+/// The session's credentials; none while the sign-in service is down.
 fn credentials(parts: &Parts) -> Option<&Credentials<Connection>> {
     match parts.extensions.get::<Signed>() {
         Some(Signed::In(credentials)) => Some(credentials),
-        Some(Signed::Token(_) | Signed::IssuerDown) | None => None,
+        Some(Signed::IssuerDown) | None => None,
     }
 }
 

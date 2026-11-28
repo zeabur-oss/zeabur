@@ -10,7 +10,6 @@ mod forward;
 mod in_process;
 mod output;
 mod pack;
-mod server;
 mod telemetry;
 mod templates;
 mod ui;
@@ -43,9 +42,9 @@ enum Command {
     /// Upload a folder to a service that builds one, and build it.
     ///
     /// The files `.gitignore` and `.dockerignore` leave out are not sent. The service is made when
-    /// it does not exist. With a token from Zeabur Identity, the folder goes through Zeabur in the
-    /// cluster. With other credentials, zeaburctl does the same steps on this computer, and the
-    /// credentials stay here.
+    /// it does not exist. zeaburctl acts with your kubeconfig through the Kubernetes API, and
+    /// forwards a port to the registry when only the cluster reaches it, which needs `get
+    /// services`, `list endpointslices` and `create pods/portforward` in the registry's namespace.
     Up(up::UpArgs),
     /// Reach a database or a service of a project from this computer: forward a local port to it
     /// and print a connection URI on 127.0.0.1 for a database, the address for a service.

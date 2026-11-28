@@ -6,6 +6,7 @@ use std::net::Ipv4Addr;
 
 use kube::Api;
 use kube::api::{ListParams, PostParams};
+pub(crate) use zeabur_api::settings::ServiceAddress;
 use zeabur_kube::k8s_openapi::api::authorization::v1::{
     ResourceAttributes, SelfSubjectAccessReview, SelfSubjectAccessReviewSpec,
 };
@@ -14,43 +15,6 @@ use zeabur_kube::k8s_openapi::api::discovery::v1::EndpointSlice;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 
 use crate::output;
-
-/// A Service port, from its in-cluster address.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ServiceAddress {
-    pub(crate) namespace: String,
-    pub(crate) name: String,
-    pub(crate) port: u16,
-}
-
-impl ServiceAddress {
-    /// `<name>.<namespace>.svc[.cluster.local][:port]` (port 443 when left out); `None` for
-    /// another address.
-    pub(crate) fn parse(address: &str) -> Option<Self> {
-        let address = address.strip_prefix("https://").unwrap_or(address);
-        let (host, port) = match address.rsplit_once(':') {
-            Some((host, port)) => (host, port.parse().ok()?),
-            None => (address, 443),
-        };
-        let host = host.strip_suffix(".cluster.local").unwrap_or(host);
-        let mut labels = host.strip_suffix(".svc")?.split('.');
-        let (Some(name), Some(namespace), None) = (labels.next(), labels.next(), labels.next())
-        else {
-            return None;
-        };
-        (!name.is_empty() && !namespace.is_empty()).then(|| Self {
-            namespace: namespace.to_owned(),
-            name: name.to_owned(),
-            port,
-        })
-    }
-}
-
-impl std::fmt::Display for ServiceAddress {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}/{}:{}", self.namespace, self.name, self.port)
-    }
-}
 
 /// Listens on loopback port `local` (any free port for 0) and forwards each connection to a
 /// ready pod of `service`. Gives the port.
@@ -172,36 +136,4 @@ async fn target(client: &kube::Client, service: &ServiceAddress) -> Result<(Stri
         }
     }
     Err("no pod of the Service is ready".to_owned())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn only_an_in_cluster_service_address_is_forwarded() {
-        let zot = ServiceAddress {
-            namespace: "zot".to_owned(),
-            name: "zot".to_owned(),
-            port: 5000,
-        };
-        assert_eq!(ServiceAddress::parse("zot.zot.svc:5000"), Some(zot.clone()));
-        assert_eq!(
-            ServiceAddress::parse("https://zot.zot.svc.cluster.local:5000"),
-            Some(zot)
-        );
-        assert_eq!(
-            ServiceAddress::parse("registry.reg.svc").map(|s| s.port),
-            Some(443)
-        );
-        for other in [
-            "registry.example.com:5000",
-            "ghcr.io",
-            "a.b.c.svc:5000",
-            "zot.svc:5000",
-            "127.0.0.1:5000",
-        ] {
-            assert_eq!(ServiceAddress::parse(other), None, "{other}");
-        }
-    }
 }

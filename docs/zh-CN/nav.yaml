@@ -27,6 +27,7 @@
     databases: 创建、备份与还原数据库
     object-storage: 创建 S3 对象存储与存储桶
     cron-jobs: 按定时运行服务命令
+    from-outside: 从自己的电脑或 CI 连接
 - group: configure
   label: 调整服务设置
   pages:

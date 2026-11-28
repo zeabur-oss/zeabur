@@ -176,7 +176,7 @@ PostgreSQL、MongoDB、MySQL、MariaDB 只列出成功且包含还原信息的�
 zeaburctl connect shop/orders
 ```
 
-它会通过 kube-apiserver 把本机的一个端口接到数据库，并打印 `127.0.0.1` 的连接字符串。集群里什么都不改，按 Ctrl-C 就断开。你需要在项目里有 `create pods/portforward` 权限，开发者都有。选项见 [`connect`](../reference/zeaburctl.mdx#connect)。
+它会通过 kube-apiserver 把本机的一个端口接到数据库，并打印 `127.0.0.1` 的连接字符串。集群里什么都不改，按 Ctrl-C 就断开。你需要在项目里有 `create pods/portforward` 权限，开发者都有。选项见 [`connect`](../reference/zeaburctl.mdx#connect)。要从自己的电脑登录，在 psql、DBeaver 中打开数据库，见[从自己的电脑或 CI 连接](./from-outside.mdx)。
 
 ## 确认结果
 

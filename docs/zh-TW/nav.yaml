@@ -27,6 +27,7 @@
     databases: 建立、備份與還原資料庫
     object-storage: 建立 S3 物件儲存與儲存貯體
     cron-jobs: 依排程執行服務指令
+    from-outside: 從自己的電腦或 CI 連線
 - group: configure
   label: 調整服務設定
   pages:

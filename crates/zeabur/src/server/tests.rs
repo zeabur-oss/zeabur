@@ -126,7 +126,6 @@ impl Rig {
         ));
         let auth = Arc::new(Auth {
             public,
-            issuer: issuer.url(),
             oauth,
             sessions,
             connect,
@@ -513,80 +512,23 @@ async fn a_signed_in_person_uses_the_api_as_themselves() {
     assert_eq!(view["signsIn"], true);
 }
 
-/// A command-line client presents the person's own token instead of a cookie: it acts as that
-/// person, with that person's rights, and the guard still wants a change to say where it comes
-/// from.
+/// Zeabur signs people in with a session cookie only. A token in `Authorization`, even one
+/// Zeabur Identity issued, signs nothing in.
 #[tokio::test]
-async fn a_bearer_token_acts_as_the_person_who_holds_it() {
+async fn a_bearer_token_without_a_session_is_signed_out() {
     let rig = Rig::new().await;
-    let get = |token: String| {
-        let authorization = format!("Bearer {token}");
-        let rig = &rig;
-        async move {
-            let response = rig
-                .send(
-                    Method::GET,
-                    "/api/v1/whoami",
-                    &[HOST, ("authorization", &authorization)],
-                )
-                .await;
-            (response.status(), json_of(response).await)
-        }
-    };
-    let (status, whoami) = get(rig.token("alice")).await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(whoami["username"], "alice");
-    let (status, problem) = get(rig.token("mallory")).await;
-    assert_eq!(status, StatusCode::UNAUTHORIZED, "{problem}");
-
-    let alice = format!("Bearer {}", rig.token("alice"));
-    let plan = json!({"changes": [{"op": "env",
-        "workload": {"kind": "Deployment", "name": "web"},
-        "changes": [{"op": "set", "name": "MODE", "value": "maintenance"}]}]});
-    let post = |headers: &[(&str, &str)]| {
-        let mut request = Request::post("/api/v1/projects/shop/plan")
-            .header("host", HOST.1)
-            .header("authorization", alice.as_str())
-            .header("content-type", "application/json");
-        for (name, value) in headers {
-            request = request.header(*name, *value);
-        }
-        let request = request.body(Body::from(plan.to_string())).unwrap();
-        let app = rig.app.clone();
-        async move { app.oneshot(request).await.unwrap().status() }
-    };
-    assert_eq!(post(&[]).await, StatusCode::FORBIDDEN);
-    assert_eq!(
-        post(&[("origin", PUBLIC), ("zeabur-request", "1")]).await,
-        StatusCode::OK
-    );
-}
-
-/// Zeabur uses only a token from Zeabur Identity. A ServiceAccount token, a token of another
-/// issuer or a static token is signed out, also when kube-apiserver accepts it.
-#[tokio::test]
-async fn a_bearer_token_of_another_issuer_is_signed_out() {
-    let rig = Rig::new().await;
-    for token in [
-        jwt(
-            &json!({"iss": "https://kubernetes.default.svc.cluster.local",
-            "sub": "system:serviceaccount:shop:default"}),
-        ),
-        jwt(&json!({"iss": "kubernetes/serviceaccount", "sub": "alice"})),
-        jwt(&json!({"iss": "https://accounts.google.com", "sub": "alice"})),
-        jwt(&json!({"sub": "alice"})),
-        "alice:1".to_owned(),
-    ] {
-        let response = rig
-            .send(
-                Method::GET,
-                "/api/v1/whoami",
-                &[HOST, ("authorization", &format!("Bearer {token}"))],
-            )
-            .await;
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{token}");
-        assert_eq!(json_of(response).await["type"], "/problems/signed-out");
-    }
+    let response = rig
+        .send(
+            Method::GET,
+            "/api/v1/whoami",
+            &[
+                HOST,
+                ("authorization", &format!("Bearer {}", rig.token("alice"))),
+            ],
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(json_of(response).await["type"], "/problems/signed-out");
 }
 
 /// A request with a session cookie uses only the session. When the session ended, a bearer
@@ -609,41 +551,6 @@ async fn an_ended_session_does_not_fall_back_to_a_bearer_token() {
         )
         .await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-}
-
-/// A bearer token is not kept, so a tools pod or Zeabur Proxy (log history) never gets it.
-#[tokio::test]
-async fn a_bearer_token_starts_no_tools_pod() {
-    let rig = Rig::new().await;
-    let request = Request::post("/api/v1/cluster/tools/plan")
-        .header("host", HOST.1)
-        .header("authorization", format!("Bearer {}", rig.token("root")))
-        .header("origin", PUBLIC)
-        .header("zeabur-request", "1")
-        .header("content-type", "application/json")
-        .body(Body::from("{}"))
-        .unwrap();
-    let response = rig.app.clone().oneshot(request).await.unwrap();
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    assert_eq!(json_of(response).await["type"], "/problems/bad-request");
-}
-
-#[test]
-fn a_bearer_token_is_never_handed_on() {
-    use zeabur_api::access::ClusterAccess as _;
-
-    use super::{SessionAccess, Signed};
-
-    let access = SessionAccess {
-        origin: PUBLIC.to_owned(),
-    };
-    let mut parts = Request::builder().body(()).unwrap().into_parts().0;
-    parts.extensions.insert(Signed::Token(Connection {
-        cluster: Arc::new(cluster("alice")),
-        token: UserToken::new(SecretString::from("alice:1")).unwrap(),
-    }));
-    assert!(access.for_request(&parts).is_ok());
-    assert!(access.handoff(&parts).is_none());
 }
 
 #[tokio::test]

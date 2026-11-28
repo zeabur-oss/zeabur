@@ -178,56 +178,6 @@ impl UserToken {
         })))
     }
 
-    /// The bearer token the kubeconfig signs `context` (the current one when `None`) in with,
-    /// as the kubeconfig's own token, token file or credential plugin gives it now.
-    ///
-    /// # Errors
-    ///
-    /// When the kubeconfig cannot be used, or signs in without a bearer token (a client
-    /// certificate, a password).
-    pub async fn from_kubeconfig(context: Option<&str>) -> Result<Self, ConnectError> {
-        let options = kube::config::KubeConfigOptions {
-            context: context.map(str::to_owned),
-            ..kube::config::KubeConfigOptions::default()
-        };
-        let config = kube::Config::from_kubeconfig(&options)
-            .await
-            .map_err(|e| ConnectError::Kubeconfig(e.to_string()))?;
-        Self::signed_in_by(config).await
-    }
-
-    async fn signed_in_by(config: kube::Config) -> Result<Self, ConnectError> {
-        use kube::client::ConfigExt as _;
-        let seen = Arc::new(Mutex::new(None::<http::HeaderValue>));
-        let sink = Arc::clone(&seen);
-        let capture = tower::service_fn(move |request: http::Request<kube::client::Body>| {
-            let header = request.headers().get(http::header::AUTHORIZATION).cloned();
-            *sink.lock().unwrap_or_else(PoisonError::into_inner) = header;
-            std::future::ready(Ok::<_, std::convert::Infallible>(http::Response::new(
-                kube::client::Body::empty(),
-            )))
-        });
-        let service = tower::ServiceBuilder::new()
-            .option_layer(config.auth_layer().map_err(|e| refused(&e))?)
-            .map_err(tower::BoxError::from)
-            .service(capture);
-        let probe = kube::Client::new(service, config.default_namespace);
-        // The answer is empty on purpose; only the header the auth layer adds matters.
-        drop(probe.apiserver_version().await);
-        let header = seen
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .take()
-            .and_then(|value| value.to_str().ok().map(str::to_owned));
-        let token = header
-            .as_deref()
-            .and_then(|value| value.strip_prefix("Bearer "))
-            .ok_or_else(|| {
-                ConnectError::Kubeconfig("it does not sign in with a bearer token".to_owned())
-            })?;
-        Self::new(SecretString::from(token.to_owned()))
-    }
-
     /// The token.
     #[must_use]
     pub fn secret(&self) -> &SecretString {
@@ -367,10 +317,6 @@ impl UserClient {
 /// The data of the ConfigMap [`INFO_CONFIG_MAP`].
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ZeaburInfo {
-    /// Where Zeabur is.
-    pub url: Option<String>,
-    /// The Zeabur Identity issuer whose tokens Zeabur accepts.
-    pub issuer: Option<String>,
     /// The registry Zeabur Builder pushes to, such as `zot.zot.svc:5000`.
     pub registry: Option<String>,
 }
@@ -383,35 +329,13 @@ fn info_of(map: k8s_openapi::api::core::v1::ConfigMap) -> ZeaburInfo {
         (!value.is_empty()).then(|| value.to_owned())
     };
     ZeaburInfo {
-        url: take("url"),
-        issuer: take("issuer"),
         registry: take("registry"),
     }
 }
 
-/// Whether `token` is a JWT whose `iss` is `issuer`. The signature is not checked here;
-/// kube-apiserver checks it.
-#[must_use]
-pub fn issued_by(token: &str, issuer: &str) -> bool {
-    use base64::Engine as _;
-    let mut parts = token.split('.');
-    let (Some(_header), Some(payload), Some(_signature), None) =
-        (parts.next(), parts.next(), parts.next(), parts.next())
-    else {
-        return false;
-    };
-    let Ok(payload) = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(payload) else {
-        return false;
-    };
-    serde_json::from_slice::<serde_json::Value>(&payload)
-        .ok()
-        .and_then(|claims| claims.get("iss")?.as_str().map(str::to_owned))
-        .is_some_and(|iss| iss.trim_end_matches('/') == issuer.trim_end_matches('/'))
-}
-
 /// The namespace every signed-in person may read, as kubeadm's cluster-info lives in.
 pub const INFO_NAMESPACE: &str = "kube-public";
-/// The ConfigMap whose `url` is where Zeabur is and whose `issuer` signs its people in.
+/// The ConfigMap whose `registry` is where Zeabur Builder pushes to.
 pub const INFO_CONFIG_MAP: &str = "zeabur-info";
 
 /// How long a connection to kube-apiserver stays open unused.
@@ -542,14 +466,34 @@ fn kubeconfig_cluster(context: Option<&str>) -> Option<String> {
 }
 
 fn cluster_of(kubeconfig: kube::config::Kubeconfig, context: Option<&str>) -> Option<String> {
+    context_of(kubeconfig, context)
+        .map(|c| c.cluster)
+        .filter(|cluster| !cluster.is_empty())
+}
+
+/// The namespace that the kubeconfig's context `context` (the current one when `None`) sets.
+/// `None` when the context sets none: [`kube::Config`] puts `default` in its place.
+#[must_use]
+pub fn kubeconfig_namespace(context: Option<&str>) -> Option<String> {
+    namespace_of(kube::config::Kubeconfig::read().ok()?, context)
+}
+
+fn namespace_of(kubeconfig: kube::config::Kubeconfig, context: Option<&str>) -> Option<String> {
+    context_of(kubeconfig, context)?
+        .namespace
+        .filter(|namespace| !namespace.is_empty())
+}
+
+fn context_of(
+    kubeconfig: kube::config::Kubeconfig,
+    context: Option<&str>,
+) -> Option<kube::config::Context> {
     let context = context.map(str::to_owned).or(kubeconfig.current_context)?;
     kubeconfig
         .contexts
         .into_iter()
         .find(|named| named.name == context)?
         .context
-        .map(|c| c.cluster)
-        .filter(|cluster| !cluster.is_empty())
 }
 
 /// Why a [`UserClient`] could not be built.
@@ -586,34 +530,17 @@ mod tests {
         };
         assert_eq!(
             info_of(map(serde_json::json!({
-                "url": " https://zeabur.example.com\n",
-                "issuer": "https://identity.example.com",
-                "registry": "zot.zot.svc:5000",
+                "registry": " zot.zot.svc:5000\n",
+                "url": "https://zeabur.example.com",
             }))),
             ZeaburInfo {
-                url: Some("https://zeabur.example.com".to_owned()),
-                issuer: Some("https://identity.example.com".to_owned()),
                 registry: Some("zot.zot.svc:5000".to_owned()),
             }
         );
         assert_eq!(
-            info_of(map(serde_json::json!({"url": ""}))),
+            info_of(map(serde_json::json!({"registry": ""}))),
             ZeaburInfo::default()
         );
-    }
-
-    #[tokio::test]
-    async fn a_kubeconfig_token_is_the_bearer_token_and_a_certificate_is_none() {
-        let mut config = kube::Config::new(http::Uri::from_static("https://10.0.0.1:6443"));
-        config.auth_info.token = Some(SecretString::from("person-token"));
-        let token = UserToken::signed_in_by(config.clone()).await.unwrap();
-        assert_eq!(token.secret().expose_secret(), "person-token");
-        config.auth_info.token = None;
-        config.auth_info.client_certificate = Some("/cert".to_owned());
-        assert!(matches!(
-            UserToken::signed_in_by(config).await,
-            Err(ConnectError::Kubeconfig(_))
-        ));
     }
 
     #[test]
@@ -658,6 +585,27 @@ contexts:
             Some("prod-eu")
         );
         assert_eq!(cluster_of(kubeconfig, Some("gone")), None);
+    }
+
+    #[test]
+    fn only_a_namespace_the_context_sets_is_its_namespace() {
+        let kubeconfig = kube::config::Kubeconfig::from_yaml(
+            "apiVersion: v1
+kind: Config
+current-context: shop
+contexts:
+- name: shop
+  context: {cluster: k3d-dev, user: ci, namespace: shop}
+- name: unset
+  context: {cluster: k3d-dev, user: ci}
+",
+        )
+        .unwrap();
+        assert_eq!(
+            namespace_of(kubeconfig.clone(), None).as_deref(),
+            Some("shop")
+        );
+        assert_eq!(namespace_of(kubeconfig, Some("unset")), None);
     }
 
     #[tokio::test]
