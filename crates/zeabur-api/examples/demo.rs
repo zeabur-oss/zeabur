@@ -57,9 +57,6 @@
 //! at the start: it is installed on `acme` and `bob`, and `acme` is granted to `shop`.
 //! `ZEABUR_DEMO_GITHUB=uninstalled` makes the App at the start, installed nowhere.
 //!
-//! The Error pages template has a made-up idle use of 9 MiB, so turning on a domain's error pages
-//! says the cluster has room; `ZEABUR_DEMO_TEMPLATE_IDLE=large` makes it 24 GiB, to see it tight.
-//!
 //! `namespaces` in `ZEABUR_DEMO_FORBID` refuses creating projects. New public URLs are suggested
 //! under `apps.example.com` with HTTPS from the `ClusterIssuer` `letsencrypt`;
 //! `ZEABUR_DEMO_NO_DOMAINS=1` leaves both unset.
@@ -3120,24 +3117,6 @@ fn start(pod: &mut Pod, now: &str) {
     }
 }
 
-/// Made-up idle use for the Error pages template; `ZEABUR_DEMO_TEMPLATE_IDLE=large` makes it more
-/// than the cluster has free.
-fn template_idle(id: &str) -> Option<zeabur_catalog::IdleUse> {
-    let large = std::env::var("ZEABUR_DEMO_TEMPLATE_IDLE").is_ok_and(|v| v == "large");
-    let pod = zeabur_catalog::MeasuredPod {
-        workload: "error-pages".to_owned(),
-        memory_bytes: if large { 24 << 30 } else { 9 << 20 },
-        cpu_millicores: if large { 6000 } else { 1 },
-    };
-    (id == "error-pages").then(|| zeabur_catalog::IdleUse {
-        memory_bytes: pod.memory_bytes,
-        cpu_millicores: pod.cpu_millicores,
-        environment: "single-node-amd64-v1.36.4".to_owned(),
-        measured_at: zeabur_kube::k8s_openapi::jiff::civil::date(2026, 10, 24),
-        pods: vec![pod],
-    })
-}
-
 /// The demo's GitHub App: its key, and the installations of `ZEABUR_DEMO_GITHUB`.
 struct FakeGitHub {
     pem: String,
@@ -3489,7 +3468,6 @@ async fn main() -> std::io::Result<()> {
         clock,
         resolver: Arc::new(dns()),
         images: Some(Arc::new(images)),
-        template_idle,
         terminals,
         ..zeabur_api::Options::default()
     };

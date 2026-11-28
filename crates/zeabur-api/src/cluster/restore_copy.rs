@@ -1,13 +1,11 @@
 //! What a project restore must tell the person before it runs: what the backup holds of the
-//! project, and whether the cluster has room for a second copy.
+//! project.
 //!
 //! - **The backup.** The lists come from Velero's list of the backup's objects, not from the
 //!   project as it runs now (`backup_download::resource_list`). A Service is reached in the cluster
 //!   as `<service>.<namespace>.svc` [k8s-dns], so a copy that keeps every value still reaches the
 //!   original's Services. The plan names them, the Secrets to check, the CronJobs that a copy
 //!   pauses, and the routes that come back in a last step.
-//! - **Room.** The copy's pods request what the original's running pods request. Each must fit on
-//!   one ready, schedulable node, with a pod slot, after the larger pods are placed.
 //! - **Deleted projects.** A backup of the whole cluster names no namespaces, so `GET
 //!   /api/v1/cluster/backups/{backup}/deleted-projects` reads them from the backup's list. Only the
 //!   archive holds their labels, so Zeabur downloads it only when a listed namespace is gone.
@@ -22,31 +20,13 @@ use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_core::names::{LABEL_PROJECT, is_system_namespace};
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::{Cluster, ClusterPod, ResourceRef};
+use zeabur_kube::ResourceRef;
 use zeabur_modules::velero::cluster::Inventory;
 
 use crate::cluster::backup_download;
-use crate::cluster::capacity::{self, Amount, Fit, NodeRoom, place, pod_amounts};
 use crate::error::{ApiError, list_read, read_problem};
 use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
-
-/// The room the copy needs and the room there is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-#[schema(as = RestoreRoom)]
-pub struct Room {
-    /// Whether each of the original's pods fits on a node.
-    pub fit: Fit,
-    /// What the original's running pods request: millicores.
-    pub need_cpu: u64,
-    /// Bytes.
-    pub need_memory: u64,
-    /// What the nodes have left in total: millicores.
-    pub free_cpu: u64,
-    /// Bytes.
-    pub free_memory: u64,
-}
 
 /// What a project restore reports.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -65,34 +45,6 @@ pub struct Copy {
     /// Why Velero's list could not be read.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unread: Option<String>,
-    /// Room for a second copy; absent under the same name.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub room: Option<Room>,
-}
-
-/// The room the running pods of `source` need against what `nodes` have left.
-#[must_use]
-pub(crate) fn room(pods: &[ClusterPod], source: &str, nodes: Option<&[NodeRoom]>) -> Room {
-    let copies: Vec<Amount> = pods
-        .iter()
-        .filter(|p| p.namespace == source)
-        .filter(|p| !matches!(p.phase.as_deref(), Some("Succeeded" | "Failed")))
-        .map(|p| pod_amounts(p).0)
-        .collect();
-    let need: Amount = copies.iter().copied().sum();
-    let free: Amount = nodes.unwrap_or_default().iter().map(|node| node.free).sum();
-    let fit = match nodes {
-        None => Fit::Unknown,
-        Some(nodes) if place(&copies, nodes) => Fit::Fits,
-        Some(_) => Fit::Short,
-    };
-    Room {
-        fit,
-        need_cpu: need.cpu,
-        need_memory: need.memory,
-        free_cpu: free.cpu,
-        free_memory: free.memory,
-    }
 }
 
 /// The routes of a namespace.
@@ -101,12 +53,6 @@ pub(crate) fn routes() -> [ResourceRef; 2] {
         ResourceRef::new("networking.k8s.io", "v1", "ingresses", "Ingress"),
         ResourceRef::new("gateway.networking.k8s.io", "v1", "httproutes", "HTTPRoute"),
     ]
-}
-
-/// Reads, as the person, the room for a copy of `copy.source` into `copy`.
-pub(crate) async fn read_room(cluster: &dyn Cluster, copy: &mut Copy) {
-    let reading = capacity::read(cluster).await;
-    copy.room = Some(room(&reading.pods, &copy.source, reading.nodes.as_deref()));
 }
 
 /// The projects a backup holds that no longer exist.
@@ -170,64 +116,4 @@ pub(crate) async fn deleted_projects(
         .collect();
     items.sort();
     Ok(Json(DeletedProjects { items }))
-}
-
-#[cfg(test)]
-mod tests {
-    use zeabur_kube::ContainerResources;
-
-    use super::*;
-
-    fn pod(namespace: &str, cpu: &str, memory: &str, phase: &str) -> ClusterPod {
-        ClusterPod {
-            namespace: namespace.to_owned(),
-            phase: Some(phase.to_owned()),
-            containers: vec![ContainerResources {
-                requests: [("cpu", cpu), ("memory", memory)]
-                    .into_iter()
-                    .map(|(k, v)| (k.to_owned(), v.to_owned()))
-                    .collect(),
-                ..ContainerResources::default()
-            }],
-            ..ClusterPod::default()
-        }
-    }
-
-    #[test]
-    fn a_copy_needs_what_the_running_pods_request_and_fits_only_in_the_room_left() {
-        let pods = [
-            pod("blog", "500m", "1Gi", "Running"),
-            pod("blog", "4", "8Gi", "Succeeded"),
-            pod("shop", "2", "2Gi", "Running"),
-        ];
-        let node = |cpu, memory| NodeRoom {
-            free: Amount { cpu, memory },
-            pods: 10,
-            ..NodeRoom::default()
-        };
-        let roomy = [node(1000, 4 << 30)];
-        let tight = [node(400, 4 << 30)];
-        let fits = room(&pods, "blog", Some(&roomy));
-        assert_eq!(
-            (fits.fit, fits.need_cpu, fits.need_memory),
-            (Fit::Fits, 500, 1 << 30)
-        );
-        assert_eq!(room(&pods, "blog", Some(&tight)).fit, Fit::Short);
-        assert_eq!(room(&pods, "blog", None).fit, Fit::Unknown);
-    }
-
-    #[test]
-    fn room_spread_over_nodes_does_not_fit_a_pod_larger_than_any_one_of_them() {
-        let pods = [pod("blog", "100m", "2Gi", "Running")];
-        let gib = NodeRoom {
-            free: Amount {
-                cpu: 4000,
-                memory: 1 << 30,
-            },
-            pods: 10,
-            ..NodeRoom::default()
-        };
-        let copy = room(&pods, "blog", Some(&[gib, gib, gib]));
-        assert_eq!((copy.fit, copy.free_memory), (Fit::Short, 3 << 30));
-    }
 }

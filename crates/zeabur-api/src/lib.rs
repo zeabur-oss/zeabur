@@ -25,7 +25,6 @@
 //! | `GET /api/v1/cluster/catalog` | the Zeabur Catalog release Zeabur reads, when it was read, and why the last read failed |
 //! | `GET /api/v1/cluster/templates` | the catalogue's templates: what each asks for and requests, and whether its components are there |
 //! | `GET /api/v1/cluster/templates/{template}` | one of them, with what its pods use when idle |
-//! | `GET /api/v1/cluster/template-rooms` | whether each template's pods fit, each on one node |
 //! | `GET /api/v1/settings/metrics-store` | the metrics store history is read from, whether it answers, who may change it |
 //! | `PUT /api/v1/settings/metrics-store` | changes it, or goes back to the default |
 //! | `GET /api/v1/settings/sign-in` | how admin accounts sign in (Zeabur Identity's teams and AAL3 settings), who may change it |
@@ -271,7 +270,6 @@ macro_rules! handlers {
             cluster::config_reload::get,
             cluster::templates::list,
             cluster::templates::get,
-            cluster::template_room::rooms,
             cluster::node_shells::list,
             cluster::node_shells::plan,
             cluster::node_shells::apply,
