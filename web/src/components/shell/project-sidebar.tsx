@@ -15,6 +15,7 @@ import { databasesQuery, objectStorageQuery, projectQuery } from "@/api/queries"
 import { AddMenu } from "@/components/add/menu"
 import { RoleIcon, ServiceIcon } from "@/components/service-icon"
 import { DockToggle } from "@/components/shell/dock-slot"
+import { GroupButton } from "@/components/shell/service-groups"
 import { ContextMenu } from "@/components/shell/user-menu"
 import { ProjectGlyph } from "@/components/shell/project-glyph"
 import { SearchRow } from "@/components/shell/search-row"
@@ -179,7 +180,17 @@ function ProjectNav({ project }: { project: string }) {
       <SearchRow />
       <SidebarContent>
         <SidebarGroup>{pages.map(pageRow)}</SidebarGroup>
-        <SidebarSection title={t("column.label")} action={<AddMenu project={project} compact />}>
+        <SidebarSection
+          title={t("column.label")}
+          action={
+            <>
+              {data && data.services.length > 0 ? (
+                <GroupButton project={project} services={data.services} />
+              ) : null}
+              <AddMenu project={project} compact />
+            </>
+          }
+        >
           {data ? (
             <Services project={project} data={data} />
           ) : view.isPending ? (

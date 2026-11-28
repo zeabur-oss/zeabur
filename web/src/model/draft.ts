@@ -27,7 +27,6 @@ const PARTS: Partial<Record<Change["op"], DraftPart>> = {
   probe: "health-checks",
   editTask: "schedule",
   autoUpdate: "updates",
-  group: "group",
 }
 
 export function partOf(change: Change): DraftPart | undefined {
@@ -36,7 +35,6 @@ export function partOf(change: Change): DraftPart | undefined {
 
 /** The parts in the order of the tabs. */
 export const partOrder: DraftPart[] = [
-  "group",
   "networking",
   "variables",
   "updates",
@@ -81,7 +79,6 @@ const keys: Keys = {
   pageServer: (c) => c.op,
   editTask: (c) => `editTask:${c.cronJob}`,
   autoUpdate: (c) => `autoUpdate:${workloadKey(c.workload)}`,
-  group: (c) => `group:${workloadKey(c.workload)}`,
   expandVolume: (c) => `expand:${c.claim}`,
   editMount: mountKey,
   removeVolume: mountKey,
