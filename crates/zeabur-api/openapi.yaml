@@ -7616,6 +7616,13 @@ components:
         license:
           type: string
           description: Its licence (SPDX).
+        memory:
+          oneOf:
+          - $ref: "#/components/schemas/ComponentMemory"
+            description: |-
+              The memory it uses, from Zeabur Catalog's measurement of its idle pods and the `use` of
+              its work; absent when the catalogue has no measurement of it.
+          - type: "null"
         summary:
           type: object
           description: |-
@@ -7728,6 +7735,28 @@ components:
           oneOf:
           - $ref: "#/components/schemas/InputValue"
             description: The value the plan writes; never for a Secret.
+          - type: "null"
+    ComponentMemory:
+      type: object
+      description: "The memory a component uses: its measured idle use plus one unit of its heaviest work."
+      required:
+      - idle
+      - totalBytes
+      properties:
+        idle:
+          $ref: "#/components/schemas/IdleUse"
+          description: What its pods used once idle.
+        totalBytes:
+          type: integer
+          format: int64
+          description: |-
+            The idle memory plus the work's: what the component uses while it does one unit of that
+            work, such as one build.
+          minimum: 0
+        work:
+          oneOf:
+          - $ref: "#/components/schemas/WorkUse"
+            description: Its work whose `use` has the most memory; absent when the catalogue lists none.
           - type: "null"
     ComponentPlan:
       type: object
@@ -11155,8 +11184,8 @@ components:
       - wildcardNeedsDns01
     IdleUse:
       type: object
-      description: >-
-        What a template's pods used once idle, on a fresh cluster after its smoke
+      description: |-
+        What a template's or a component's pods used once idle, on a fresh cluster after its smoke
         checks.
       required:
       - memoryBytes
@@ -20669,6 +20698,23 @@ components:
         username:
           type: string
           description: User name.
+    WorkUse:
+      type: object
+      description: >-
+        What one unit of a component's work uses on top of its idle use, as the
+        catalogue declares it.
+      required:
+      - name
+      - memoryBytes
+      properties:
+        memoryBytes:
+          type: integer
+          format: int64
+          description: Its memory in bytes.
+          minimum: 0
+        name:
+          type: string
+          description: The work's name in the catalogue (`build`).
     WorkloadKind:
       type: string
       description: |-

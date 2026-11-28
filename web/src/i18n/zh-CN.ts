@@ -1202,6 +1202,10 @@ export const zhCN: Messages = {
   "components.packaged": (by, chart) =>
     `这是 ${by} 的内置组件。要修改设置，请创建名为 ${chart} 的 HelmChartConfig。`,
   "components.packagedHow": "示例",
+  "components.memoryIdle": (idle) => `空闲时约用 ${idle} 内存。`,
+  "components.memoryBuild": (total, idle) => `运行一次构建时约用 ${total} 内存，空闲时约 ${idle}。`,
+  "components.memoryLoad": (total, idle) => `有负载时约用 ${total} 内存，空闲时约 ${idle}。`,
+  "components.memoryWork": (total, idle) => `工作时约用 ${total} 内存，空闲时约 ${idle}。`,
   "components.packagedAnchor": "修改内置组件的设置",
   "components.values": "设置值",
   "components.required": "必填",

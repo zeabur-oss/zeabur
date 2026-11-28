@@ -23,7 +23,9 @@ pub mod versions;
 pub mod zeabur;
 
 pub use installed::{ComponentUpgrade, InstallSource, Installation};
-pub use measured::{IdleUse, MeasuredPod, template_idle};
+pub use measured::{
+    ComponentMemory, IdleUse, MeasuredPod, WorkUse, component_idle, component_memory, template_idle,
+};
 pub use templates::{Catalog, Dropped, RenderError, RenderOptions, Template, template_id};
 /// The types of Zeabur Catalog's files.
 pub use zeabur_catalog_format as format;
@@ -70,6 +72,10 @@ pub struct Component {
     /// when Zeabur installs it, or has not read the catalog.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unsupported: Option<engine::Unsupported>,
+    /// The memory it uses, from Zeabur Catalog's measurement of its idle pods and the `use` of
+    /// its work; absent when the catalogue has no measurement of it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory: Option<ComponentMemory>,
 }
 
 /// The version of the first chart release whose chart (its last path segment) is one the
@@ -167,6 +173,8 @@ pub fn catalogue() -> Result<Vec<Component>, CatalogueError> {
                     .collect(),
                 kube_version: file.kube_version,
                 tested_version: tested_version(&file.releases, &file.detection),
+                memory: component_idle(id)
+                    .map(|idle| component_memory(idle, file.resources.as_ref())),
                 detection: file.detection,
                 unsupported: None,
             })
@@ -614,6 +622,7 @@ mod tests {
             detection: Detection::default(),
             tested_version: None,
             unsupported: None,
+            memory: None,
         }
     }
 

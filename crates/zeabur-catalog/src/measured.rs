@@ -1,11 +1,11 @@
-//! What a template's pods use when idle.
+//! What a template's or a component's pods use when idle.
 //!
-//! The numbers come from Zeabur Catalog's `measurements/templates/<id>.json`, which its nightly
-//! end-to-end run writes. Only passed runs count. A run lists one pod of each workload; every
-//! template runs one pod per workload (`replicas: 1`, `instances: 1`), so the rows are the
-//! template's pods.
+//! The numbers come from Zeabur Catalog's `measurements/templates/<id>.json` and
+//! `measurements/components/<id>.json`, which its nightly end-to-end run writes. Only passed runs
+//! count. A run lists one pod of each workload; every template runs one pod per workload
+//! (`replicas: 1`, `instances: 1`), so the rows are the template's pods.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_catalog_format::api::{Environment, MeasuredDistribution, MeasurementFile, RunResult};
 use zeabur_catalog_format::common::Profile;
@@ -14,8 +14,9 @@ use zeabur_model::kernel::quantity;
 
 use crate::bundle;
 
-/// What a template's pods used once idle, on a fresh cluster after its smoke checks.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+/// What a template's or a component's pods used once idle, on a fresh cluster after its smoke
+/// checks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct IdleUse {
     /// The pods' working set in bytes.
@@ -31,7 +32,7 @@ pub struct IdleUse {
 }
 
 /// What one pod of a workload used once idle.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MeasuredPod {
     /// The workload or database object (`miniflux-db`).
@@ -68,6 +69,64 @@ pub fn template_idle(id: &str) -> Option<IdleUse> {
         .iter()
         .find(|(name, _)| *name == id)
         .and_then(|(_, text)| idle_from(text))
+}
+
+/// What the component `id` uses when idle, as the embedded catalogue measured it; `None` when it
+/// has no measurement.
+#[must_use]
+pub fn component_idle(id: &str) -> Option<IdleUse> {
+    bundle::COMPONENT_MEASUREMENTS
+        .iter()
+        .find(|(name, _)| *name == id)
+        .and_then(|(_, text)| idle_from(text))
+}
+
+/// The memory a component uses: its measured idle use plus one unit of its heaviest work.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ComponentMemory {
+    /// What its pods used once idle.
+    pub idle: IdleUse,
+    /// Its work whose `use` has the most memory; absent when the catalogue lists none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub work: Option<WorkUse>,
+    /// The idle memory plus the work's: what the component uses while it does one unit of that
+    /// work, such as one build.
+    pub total_bytes: u64,
+}
+
+/// What one unit of a component's work uses on top of its idle use, as the catalogue declares it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkUse {
+    /// The work's name in the catalogue (`build`).
+    pub name: String,
+    /// Its memory in bytes.
+    pub memory_bytes: u64,
+}
+
+/// `idle` plus the work in `resources` whose `use` has the most memory.
+#[must_use]
+pub fn component_memory(
+    idle: IdleUse,
+    resources: Option<&zeabur_catalog_format::component::Resources>,
+) -> ComponentMemory {
+    let work = resources
+        .into_iter()
+        .flat_map(|r| &r.work)
+        .filter_map(|work| {
+            let memory = work.uses.as_ref()?.memory.as_deref()?;
+            Some(WorkUse {
+                name: work.name.clone(),
+                memory_bytes: quantity::bytes(memory)?,
+            })
+        })
+        .max_by_key(|work| work.memory_bytes);
+    ComponentMemory {
+        total_bytes: idle.memory_bytes + work.as_ref().map_or(0, |w| w.memory_bytes),
+        idle,
+        work,
+    }
 }
 
 /// The newest passed run of a measurement file on a single-node kind cluster on linux/amd64, else
@@ -215,6 +274,72 @@ mod tests {
                     assert_eq!(count.trim(), "1", "{id}: {line}");
                 }
             }
+        }
+    }
+
+    fn work(name: &str, memory: Option<&str>) -> zeabur_catalog_format::component::Work {
+        serde_json::from_value(json!({"name": name, "use": memory.map(|m| json!({"memory": m}))}))
+            .unwrap()
+    }
+
+    #[test]
+    fn a_component_uses_its_idle_memory_plus_its_heaviest_work() {
+        let idle = idle_from(&bundle_of(&[run(
+            "k3s",
+            "amd64",
+            "40Mi",
+            "passed",
+            "2026-11-25",
+        )]))
+        .unwrap();
+        let resources = zeabur_catalog_format::component::Resources {
+            work: vec![
+                work("load", Some("64Mi")),
+                work("build", Some("500Mi")),
+                work("pull", None),
+            ],
+        };
+        let memory = component_memory(idle.clone(), Some(&resources));
+        assert_eq!(
+            memory.work,
+            Some(WorkUse {
+                name: "build".to_owned(),
+                memory_bytes: 500 * 1024 * 1024,
+            })
+        );
+        assert_eq!(memory.total_bytes, 550 * 1024 * 1024);
+        let idle_only = component_memory(idle, None);
+        assert_eq!(
+            (idle_only.work, idle_only.total_bytes),
+            (None, 50 * 1024 * 1024)
+        );
+    }
+
+    /// `docs/deploy/git.mdx` gives the memory Zeabur Builder uses with one build running, rounded
+    /// up to 100 MiB, and must give the figure the embedded catalogue works out.
+    #[test]
+    fn the_git_docs_give_the_builder_figure_of_the_catalogue() {
+        let builder = crate::catalogue()
+            .unwrap()
+            .into_iter()
+            .find(|c| c.id == "zeabur-builder")
+            .unwrap();
+        let memory = builder.memory.unwrap();
+        assert_eq!(memory.work.map(|w| w.name).as_deref(), Some("build"));
+        let mib = memory.total_bytes.div_ceil(100 * 1024 * 1024) * 100;
+        let docs = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs");
+        for page in [
+            "deploy/git.mdx",
+            "zh-TW/deploy/git.mdx",
+            "zh-CN/deploy/git.mdx",
+        ] {
+            let text = std::fs::read_to_string(docs.join(page)).unwrap();
+            assert!(
+                text.contains(&format!("about {mib} MiB"))
+                    || text.contains(&format!("約用 {mib} MiB"))
+                    || text.contains(&format!("约用 {mib} MiB")),
+                "{page} does not give Zeabur Builder's figure, about {mib} MiB"
+            );
         }
     }
 

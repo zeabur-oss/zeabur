@@ -7,6 +7,8 @@ description: 檢視叢集裝了哪些元件、狀態如何、還缺什麼，再�
 
 ![叢集元件頁的已安裝清單和目錄](../images/shots/cluster-components.avif)
 
+卡片顯示元件用多少記憶體，數字來自 Zeabur Catalog 在新叢集上量到的 Pod 用量。會做工作的元件，例如建置，數字包含一次這種工作：Zeabur Builder 的數字是跑一次建置的用量。Zeabur 開源版不檢查叢集有沒有這麼多空閒記憶體，請和**叢集** → **節點**上的剩餘記憶體比較。
+
 ## 開始之前
 
 你能讀取整個叢集的 CRD、IngressClass 和各 Namespace 的工作負載，元件頁才偵測得到已安裝的元件。
