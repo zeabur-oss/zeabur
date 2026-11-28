@@ -30,7 +30,7 @@ env:
 
 jobs:
   generate:
-    runs-on: instabox-small
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -109,7 +109,7 @@ jobs:
 
   publish:
     needs: check
-    runs-on: instabox-small
+    runs-on: ubuntu-slim
     timeout-minutes: 10
     permissions: {}
     steps:
