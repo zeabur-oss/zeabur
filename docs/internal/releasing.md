@@ -11,7 +11,7 @@ the `CHANGELOG.md` section, and writes and verifies `SHA256SUMS`. A manual run o
 rehearses: it checks, builds and smokes every platform, and publishes nothing. The draft
 release, with its title and notes, is made by the Release pull request workflow when it tags.
 
-Jobs that are not per platform run on Instabox (`instabox-small`). The platform builds run on
+Jobs that are not per platform run on `ubuntu-26.04` (`attest` on `ubuntu-slim`). The platform builds run on
 GitHub's runners: Linux amd64 and arm64, macOS arm64, and Windows for Zeabur Desktop.
 
 Zeabur Desktop builds in the same workflow, and `publish` waits for it, so nothing is published
@@ -63,9 +63,9 @@ differs from the root `Cargo.toml`.
 
 | Job | Where | Does |
 |---|---|---|
-| `desktop-prepare` | Instabox, in the dev shell | Builds `web/dist` and `desktop/web/dist`, copies the catalog, and names the dev shell's nightly and `tauri-cli` (`scripts/ci/desktop-inputs.sh`). |
+| `desktop-prepare` | `ubuntu-26.04`, in the dev shell | Builds `web/dist` and `desktop/web/dist`, copies the catalog, and names the dev shell's nightly and `tauri-cli` (`scripts/ci/desktop-inputs.sh`). |
 | `desktop-build` | macOS arm64, Windows amd64, Linux amd64 and arm64 (Ubuntu 24.04, for its older glibc) | Outside the Nix shell, with the runner's compiler, linker and libraries, the same nightly through rustup and `tauri-cli` from crates.io: compiles the app, then packages and signs it in a step of its own (`scripts/package-desktop.sh`). The compile step fails if the binary links anything from `/nix/store` (`otool -L` on macOS, `readelf -d` on Linux); the packages themselves are not scanned for libraries. |
-| `desktop-updater` | Instabox, `main` and tags, once `desktop/tauri.conf.json` has an updater public key | Signs the `.app.tar.gz`, the `-setup.exe` and the `.AppImage` with `cargo tauri signer sign` and writes `latest.json` from the `.sig` files, with the `CHANGELOG.md` section as its notes (`scripts/desktop-release.ts`). It is the only job in the `desktop-updater` environment, which alone holds the updater key; a build job has one environment, the platform's signing one, so it cannot sign these files. The signature is not checked against `desktop/tauri.conf.json`'s public key before the release; a key that does not match shows when the first update is refused, so test one update after changing the key. |
+| `desktop-updater` | `ubuntu-26.04`, `main` and tags, once `desktop/tauri.conf.json` has an updater public key | Signs the `.app.tar.gz`, the `-setup.exe` and the `.AppImage` with `cargo tauri signer sign` and writes `latest.json` from the `.sig` files, with the `CHANGELOG.md` section as its notes (`scripts/desktop-release.ts`). It is the only job in the `desktop-updater` environment, which alone holds the updater key; a build job has one environment, the platform's signing one, so it cannot sign these files. The signature is not checked against `desktop/tauri.conf.json`'s public key before the release; a key that does not match shows when the first update is refused, so test one update after changing the key. |
 
 | Platform | Files | The updater installs |
 |---|---|---|

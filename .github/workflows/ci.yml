@@ -6,7 +6,8 @@ name: CI
 # to land. The nightly run runs everything, also fuzz and the canary, which are not in the merge
 # queue, and keeps main's caches for the merge queue's jobs. A failed nightly-only job (fuzz,
 # canary, e2e-full) opens or updates one issue (scripts/nightly-issues.sh), and closes it when the
-# job passes again. Jobs that compile Rust run on instabox-medium, the others on instabox-small.
+# job passes again. Jobs in the dev shell run on ubuntu-26.04, the cluster jobs on ubuntu-26.04-arm,
+# and the short jobs without Nix on ubuntu-slim.
 on:
   push:
     branches: [main]
@@ -28,7 +29,7 @@ env:
 
 jobs:
   lint:
-    runs-on: instabox-medium
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -55,7 +56,7 @@ jobs:
           retention-days: 14
 
   test:
-    runs-on: instabox-medium
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -68,7 +69,7 @@ jobs:
       - run: nix develop -c scripts/ci/test.sh
 
   ui:
-    runs-on: instabox-medium
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -84,7 +85,7 @@ jobs:
 
   # desktop/, its own Cargo workspace, with the main workspace's rules (scripts/check-desktop.sh).
   desktop:
-    runs-on: instabox-medium
+    runs-on: ubuntu-26.04
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -99,7 +100,7 @@ jobs:
   # Four to six minutes, set up included: nightly and by hand, not in the merge queue.
   fuzz:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: instabox-medium
+    runs-on: ubuntu-26.04
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -113,7 +114,7 @@ jobs:
 
   no-ui:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: instabox-medium
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -127,7 +128,7 @@ jobs:
 
   wording:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: instabox-small
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -222,8 +223,8 @@ jobs:
   nightly-issues:
     if: always() && github.event_name == 'schedule'
     needs: [fuzz, canary, e2e-full]
-    runs-on: instabox-small
-    timeout-minutes: 120
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
     permissions:
       contents: read
       issues: write
@@ -238,7 +239,7 @@ jobs:
         run: scripts/nightly-issues.sh
 
   docs:
-    runs-on: instabox-small
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - uses: zeabur-oss/website/.github/actions/docs-check@c116a11cf3e0b0c940b50d962457c565881fb95a # main
@@ -248,7 +249,7 @@ jobs:
     name: ci / ok
     if: always()
     needs: [lint, test, ui, desktop, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full, docs]
-    runs-on: instabox-small
+    runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
       - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

@@ -20,7 +20,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: instabox-medium
+    runs-on: ubuntu-26.04
     timeout-minutes: 60
     permissions:
       contents: read
