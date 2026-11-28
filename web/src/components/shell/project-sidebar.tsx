@@ -182,14 +182,7 @@ function ProjectNav({ project }: { project: string }) {
         <SidebarGroup>{pages.map(pageRow)}</SidebarGroup>
         <SidebarSection
           title={t("column.label")}
-          action={
-            <>
-              {data && data.services.length > 0 ? (
-                <GroupButton project={project} services={data.services} />
-              ) : null}
-              <AddMenu project={project} compact />
-            </>
-          }
+          action={<ServicesActions project={project} data={data} />}
         >
           {data ? (
             <Services project={project} data={data} />
@@ -226,6 +219,17 @@ function ProjectNav({ project }: { project: string }) {
         <ContextMenu />
       </SidebarFooter>
     </Sidebar>
+  )
+}
+
+function ServicesActions({ project, data }: { project: string; data?: Project }) {
+  return (
+    <>
+      {data && data.services.length > 0 ? (
+        <GroupButton project={project} services={data.services} />
+      ) : null}
+      <AddMenu project={project} compact />
+    </>
   )
 }
 
