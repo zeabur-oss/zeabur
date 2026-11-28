@@ -159,6 +159,7 @@ function BuildView({
         onDeploy={deploy}
         onRebuild={rebuild}
       />
+      {build.builder === "agent" ? <AgentPlan build={build} runs={runs} plan={plan} /> : null}
       {isTask(service.kind) ? null : (
         <AutoUpdate service={service} build={build} managed={managed} plan={plan} />
       )}
@@ -645,6 +646,109 @@ function AutoUpdate({
           </Alert>
         )
       ) : null}
+    </section>
+  )
+}
+
+const dockerfileFrom = {
+  agent: "builds.agent.from.agent",
+  previous: "builds.agent.from.previous",
+  repository: "builds.agent.from.repository",
+} as const
+
+type PlanReport = NonNullable<BuildRun["plan"]>
+
+/** The facts of a plan that has them, as label and value. */
+function planFacts(t: ReturnType<typeof useT>, locale: string, report: PlanReport) {
+  const count = (n?: number) => (n ?? 0).toLocaleString(locale)
+  const tokens = t("builds.agent.tokenCount", count(report.inputTokens), count(report.outputTokens))
+  const facts: [string, string][] = [
+    [t("builds.agent.language"), [report.language, report.version].filter(Boolean).join(" ")],
+    [t("builds.agent.port"), report.port ? String(report.port) : ""],
+    [t("builds.agent.buildVariables"), (report.buildVariables ?? []).join(", ")],
+    [t("builds.agent.runtimeVariables"), (report.runtimeVariables ?? []).join(", ")],
+    [t("builds.agent.tokens"), report.modelCalled ? tokens : ""],
+  ]
+  return facts.filter(([, value]) => value)
+}
+
+/** Why the plan stopped, or where its Dockerfile came from. */
+function PlanOutcome({ report }: { report: PlanReport }) {
+  const t = useT()
+  const from = report.dockerfile
+  if (report.stopped) {
+    return (
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-medium">{t("builds.agent.stopped")}</p>
+        <p className="max-w-prose text-sm break-words text-fail-strong" lang="en" translate="no">
+          {report.detail ?? report.stopped}
+        </p>
+      </div>
+    )
+  }
+  if (!from || !(from in dockerfileFrom)) return null
+  return (
+    <p className="text-sm text-secondary">
+      {t(dockerfileFrom[from as keyof typeof dockerfileFrom])}
+    </p>
+  )
+}
+
+/** The switch that makes every build plan again. */
+function FreshPlan({ build, plan }: { build: Build; plan: Plan }) {
+  const t = useT()
+  const gate = useHereGate("build")
+  const toggle = (fresh: boolean) =>
+    plan({
+      title: t(fresh ? "title.freshPlanOn" : "title.freshPlanOff", build.name),
+      changes: [{ op: "buildOptions", build: build.name, freshPlan: fresh }],
+    })
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <h3 id={`fresh-${build.name}`} className="text-sm font-medium">
+          {t("builds.agent.fresh")}
+        </h3>
+        <p className="text-sm text-secondary">{t("builds.agent.freshHint")}</p>
+      </div>
+      <GateTip gate={gate}>
+        <Switch
+          checked={!!build.freshPlan}
+          onCheckedChange={toggle}
+          aria-labelledby={`fresh-${build.name}`}
+        />
+      </GateTip>
+    </div>
+  )
+}
+
+/** What the agent's newest plan did: where the Dockerfile came from, what the model found and the
+ * tokens it used; and whether every build plans again. */
+function AgentPlan({ build, runs, plan }: { build: Build; runs: BuildRun[]; plan: Plan }) {
+  const t = useT()
+  const { locale } = useI18n()
+  const report = runs.find((r) => r.plan)?.plan
+  const facts = report ? planFacts(t, locale, report) : []
+  return (
+    <section aria-labelledby={`agent-${build.name}`} className="flex flex-col gap-3">
+      <SectionHeader id={`agent-${build.name}`} title={t("builds.agent.title")} />
+      {report ? (
+        <PlanOutcome report={report} />
+      ) : (
+        <p className="text-sm text-secondary">{t("builds.agent.none")}</p>
+      )}
+      {facts.length > 0 ? (
+        <SummaryCardFacts>
+          {facts.map(([label, value]) => (
+            <SummaryCardFact key={label} label={label}>
+              <span className="truncate font-mono" translate="no">
+                {value}
+              </span>
+            </SummaryCardFact>
+          ))}
+        </SummaryCardFacts>
+      ) : null}
+      <FreshPlan build={build} plan={plan} />
     </section>
   )
 }

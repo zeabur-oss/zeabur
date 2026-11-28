@@ -20,13 +20,15 @@
 //!   still use it.
 //! - **Build options** set the `Build`'s directory and Dockerfile, and edit `spec.env`. Zeabur
 //!   Builder passes each variable to the build as a `BuildKit` secret, never as a build argument,
-//!   so a value does not stay in the image. A value from a Secret names the Secret and the key.
+//!   so a value does not stay in the image. A value from a Secret names the Secret and the key. For
+//!   the `agent` builder, `builder.zeabur.com/plan: fresh` has every run ask the model for a new
+//!   Dockerfile; without it a run builds the one an earlier run saved.
 //!
 //! [builder]: https://github.com/zeabur-oss/builder
 //! [keel]: https://keel.sh/docs/#policies
 
 use serde_json::{Value, json};
-use zeabur_builder_api::annotations::{REBUILD, UPLOAD_TOKEN_REQUEST};
+use zeabur_builder_api::annotations::{PLAN, PLAN_FRESH, REBUILD, UPLOAD_TOKEN_REQUEST};
 use zeabur_builder_api::build::{
     Build, EnvVar, EnvVarSource, MAX_ENV, MAX_PATH, MAX_UPLOAD_REQUEST, NotifyTarget, NotifyType,
     SourceKind,
@@ -451,7 +453,11 @@ impl Planner<'_> {
     }
 
     pub(crate) fn build_options(&mut self, change: &BuildOptionsChange) -> Result<(), PlanError> {
-        if change.context_dir.is_none() && change.dockerfile.is_none() && change.env.is_empty() {
+        if change.context_dir.is_none()
+            && change.dockerfile.is_none()
+            && change.env.is_empty()
+            && change.fresh_plan.is_none()
+        {
             return Err(error(
                 ErrorKind::BadRequest,
                 "no_changes",
@@ -501,6 +507,9 @@ impl Planner<'_> {
         for edit in &change.env {
             self.build_env(index, &change.build, edit)?;
         }
+        if let Some(fresh) = change.fresh_plan {
+            self.fresh_plan(index, fresh)?;
+        }
         if self.typed_build(index)?.spec.env.len() > MAX_ENV {
             return Err(error(
                 ErrorKind::BadRequest,
@@ -516,6 +525,26 @@ impl Planner<'_> {
             ));
         }
         Ok(())
+    }
+
+    /// Sets [`PLAN`] to [`PLAN_FRESH`], which has every run of an `agent` `Build` ask the model
+    /// for a new Dockerfile, or removes it.
+    fn fresh_plan(&mut self, index: usize, fresh: bool) -> Result<(), PlanError> {
+        let path = pointer(&["metadata", "annotations", PLAN]);
+        let current = self.current(index);
+        let operations = match (current.pointer(&path).cloned(), fresh) {
+            (Some(before), true) if before.as_str() == Some(PLAN_FRESH) => return Ok(()),
+            (Some(before), true) => vec![test(&path, before), replace(&path, json!(PLAN_FRESH))],
+            (None, true) => set_key(&current, "annotations", PLAN, PLAN_FRESH),
+            (Some(before), false) => vec![test(&path, before), remove(&path)],
+            (None, false) => return Ok(()),
+        };
+        self.claim(
+            index,
+            &steps("annotations", PLAN),
+            &shown("annotations", PLAN),
+        )?;
+        self.patch(index, operations)
     }
 
     /// Sets `spec.source.<field>` to `value`, or removes it when `value` is empty.

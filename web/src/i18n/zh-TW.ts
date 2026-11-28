@@ -712,6 +712,21 @@ export const zhTW: Messages = {
   "builds.image": "最新",
   "builds.container": "容器",
   "builds.builder": "建置器",
+  "builds.agent.title": "Agent 規劃",
+  "builds.agent.none": "還沒有建置做過規劃。第一次建置會請模型寫出 Dockerfile。",
+  "builds.agent.from.agent": "這次建置由模型寫出 Dockerfile。",
+  "builds.agent.from.previous": "這次建置沿用之前儲存的 Dockerfile，沒有呼叫模型。",
+  "builds.agent.from.repository": "原始程式碼裡已有 Dockerfile，這次建置直接使用，沒有呼叫模型。",
+  "builds.agent.stopped": "沒有寫出 Dockerfile",
+  "builds.agent.language": "語言",
+  "builds.agent.port": "連接埠",
+  "builds.agent.buildVariables": "建置變數",
+  "builds.agent.runtimeVariables": "執行時變數",
+  "builds.agent.tokens": "模型 token",
+  "builds.agent.tokenCount": (input, output) => `輸入 ${input}，輸出 ${output}`,
+  "builds.agent.fresh": "每次建置都重新規劃",
+  "builds.agent.freshHint":
+    "每次建置都請模型重寫 Dockerfile，每次都會用到 token。關閉時沿用已儲存的 Dockerfile。",
   "builds.deploy": "部署最新版",
   "builds.rebuild": "重新建置",
   "builds.word.waitingUpload": "等待上傳",
@@ -1861,6 +1876,8 @@ export const zhTW: Messages = {
   "title.configReload": (service: string) => `設定檔或機密變數變更時重新啟動 ${service}`,
   "title.deployBuild": (service) => `把最新的建置部署到 ${service}`,
   "title.rebuild": (build) => `重新建置 ${build}`,
+  "title.freshPlanOn": (build) => `每次建置 ${build} 都重新規劃`,
+  "title.freshPlanOff": (build) => `${build} 沿用已儲存的 Dockerfile`,
   "title.gitSource": (service) => `從 Git 建置 ${service}`,
   "title.uploadSource": (service) => `從資料夾建置 ${service}`,
   "title.stopBuilding": (build) => `停止從原始程式碼建置 ${build}`,
@@ -2664,10 +2681,15 @@ export const zhTW: Messages = {
   "add.field.method": "建置方式",
   "add.method.railpack": "Railpack",
   "add.method.dockerfile": "Dockerfile",
+  "add.method.agent": "Agent",
   "add.methodHint.railpack":
     "自動判斷語言，不需要 Dockerfile。儲存庫裡有 Dockerfile 時，請改選 Dockerfile。",
   "add.methodHint.dockerfile": "用根目錄裡的 Dockerfile 建置。其他檔案可在「更多設定」指定。",
+  "add.methodHint.agent":
+    "由模型讀取儲存庫並寫出 Dockerfile。之後的建置沿用它，只有第一次建置會用到模型的 token。",
   "add.dockerfilePortHint": "應用程式監聽的連接埠。留空表示不接受連線，例如背景服務。",
+  "add.agentPortHint":
+    "應用程式監聽的連接埠，建置頁會顯示模型找到的連接埠。留空表示不接受連線，例如背景服務。",
   "add.railpackPortHint":
     "Railpack 建置的應用程式會監聽 PORT，Zeabur 會把它設成這個連接埠。留空表示不接受連線，例如背景服務。",
   "add.access": "儲存庫存取",
@@ -2764,6 +2786,8 @@ export const zhTW: Messages = {
     "自動判斷語言，不需要 Dockerfile。資料夾裡有 Dockerfile 時，請改選 Dockerfile。",
   "upload.methodHint.dockerfile":
     "用資料夾最上層的 Dockerfile 建置。其他檔案可在「更多設定」指定。",
+  "upload.methodHint.agent":
+    "由模型讀取資料夾並寫出 Dockerfile。之後的建置沿用它，只有第一次建置會用到模型的 token。",
   "upload.problem.directory": "上傳內容裡的資料夾，像 apps/web。",
   "upload.problem.dockerfile": "上傳內容裡的檔案，像 docker/Dockerfile.prod。",
   "upload.after":

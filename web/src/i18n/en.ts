@@ -756,6 +756,23 @@ export const en = {
   "builds.image": "Newest",
   "builds.container": "Container",
   "builds.builder": "Builder",
+  "builds.agent.title": "Agent plan",
+  "builds.agent.none": "No build has planned yet. The first build asks the model for a Dockerfile.",
+  "builds.agent.from.agent": "The model wrote the Dockerfile in this build.",
+  "builds.agent.from.previous":
+    "This build reused the Dockerfile an earlier build saved. The model wasn't called.",
+  "builds.agent.from.repository":
+    "The source has its own Dockerfile, so this build used it. The model wasn't called.",
+  "builds.agent.stopped": "Stopped without a Dockerfile",
+  "builds.agent.language": "Language",
+  "builds.agent.port": "Port",
+  "builds.agent.buildVariables": "Build variables",
+  "builds.agent.runtimeVariables": "Runtime variables",
+  "builds.agent.tokens": "Model tokens",
+  "builds.agent.tokenCount": (input: string, output: string) => `${input} in, ${output} out`,
+  "builds.agent.fresh": "Plan again on every build",
+  "builds.agent.freshHint":
+    "Each build asks the model for a new Dockerfile and uses tokens. When off, builds reuse the saved one.",
   "builds.deploy": "Deploy newest",
   "builds.rebuild": "Build again",
   "builds.word.waitingUpload": "Waiting for upload",
@@ -2032,6 +2049,8 @@ export const en = {
   "title.configReload": (service: string) => `Auto-restart ${service}`,
   "title.deployBuild": (service: string) => `Deploy the newest build to ${service}`,
   "title.rebuild": (build: string) => `Build ${build} again`,
+  "title.freshPlanOn": (build: string) => `Plan ${build} again on every build`,
+  "title.freshPlanOff": (build: string) => `Reuse the saved Dockerfile for ${build}`,
   "title.gitSource": (service: string) => `Build ${service} from Git`,
   "title.uploadSource": (service: string) => `Build ${service} from a folder`,
   "title.stopBuilding": (build: string) => `Stop building ${build} from source`,
@@ -2910,11 +2929,16 @@ export const en = {
   "add.field.method": "Build with",
   "add.method.railpack": "Railpack",
   "add.method.dockerfile": "Dockerfile",
+  "add.method.agent": "Agent",
   "add.methodHint.railpack":
     "Detects the language and builds without a Dockerfile. Pick Dockerfile if the repository has one.",
   "add.methodHint.dockerfile":
     "Builds the Dockerfile in the root directory. Name another file under More settings.",
+  "add.methodHint.agent":
+    "A model reads the repository and writes a Dockerfile. Later builds reuse it, so only the first build uses model tokens.",
   "add.dockerfilePortHint": "The port the app listens on. Leave empty for a background service.",
+  "add.agentPortHint":
+    "The port the app listens on. The build page shows the port the model found. Leave empty for a background service.",
   "add.railpackPortHint":
     "Railpack apps listen on PORT, which Zeabur sets to this port. Leave empty for a background service.",
   "add.access": "Repository access",
@@ -3023,6 +3047,8 @@ export const en = {
     "Detects the language and builds without a Dockerfile. Pick Dockerfile if the folder has one.",
   "upload.methodHint.dockerfile":
     "Builds the Dockerfile in the folder's top level. Name another file under More settings.",
+  "upload.methodHint.agent":
+    "A model reads the folder and writes a Dockerfile. Later builds reuse it, so only the first build uses model tokens.",
   "upload.problem.directory": "A folder in the upload, like apps/web.",
   "upload.problem.dockerfile": "A file in the upload, like docker/Dockerfile.prod.",
   "upload.after":

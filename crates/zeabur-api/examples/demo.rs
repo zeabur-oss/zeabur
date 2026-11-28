@@ -31,6 +31,9 @@
 //! `ZEABUR_DEMO_WRONG_PORT=1` adds `lab/checkout`, a built service whose app does not listen on
 //! its port 8080 while its image declares 3000; `no-expose` makes the image declare none.
 //!
+//! `ZEABUR_DEMO_BUILD_AGENT=1` builds `blog/docs` with the `agent` builder, whose newest run
+//! reports the Dockerfile the model wrote; `stopped` reports a plan that found no app.
+//!
 //! `ZEABUR_DEMO_DELETING=1` adds a project, `archive`, that a database's finalizer keeps from
 //! being deleted.
 //!
@@ -381,10 +384,12 @@ fn dns() -> zeabur_api::resolve::Fixed {
 fn docs_build() -> [DynamicObject; 2] {
     let oom = std::env::var_os("ZEABUR_DEMO_BUILD_OOM").is_some();
     let failed = oom || std::env::var_os("ZEABUR_DEMO_BUILD_FAILED").is_some();
+    let agent = std::env::var("ZEABUR_DEMO_BUILD_AGENT").ok();
+    let builder = if agent.is_some() { "agent" } else { "railpack" };
     let build = json!({
         "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
         "metadata": {"name": "docs", "namespace": "blog", "resourceVersion": "12"},
-        "spec": {"builderRef": "railpack",
+        "spec": {"builderRef": builder,
             "source": {"type": "git", "git": {"url": "https://github.com/example/docs.git", "ref": "main"},
                 "contextDir": "site"},
             "output": {"image": "zot.zot.svc:5000/blog/docs"},
@@ -408,7 +413,20 @@ fn docs_build() -> [DynamicObject; 2] {
             "creationTimestamp": "2026-10-23T08:00:00Z"},
         "spec": {"buildRef": "docs", "revision": "3f9a1c2b7d4e5f60718293a4b5c6d7e8f9012345",
             "trigger": "poll"},
-        "status": if oom {
+        "status": if agent.as_deref() == Some("stopped") {
+            json!({"phase": "Failed", "reason": "PlanFailed",
+                "message": "the agent found no app to build",
+                "plan": {"stopped": "NoAppFound", "modelCalled": true,
+                    "detail": "No app found in site. Set the root directory to the folder that holds the app.",
+                    "inputTokens": 18_204, "outputTokens": 412}})
+        } else if agent.is_some() {
+            json!({"phase": "Succeeded", "startTime": "2026-10-23T08:00:05Z",
+                "completionTime": "2026-10-23T08:02:41Z",
+                "plan": {"dockerfile": "agent", "modelCalled": true, "port": 4321,
+                    "language": "Node.js", "version": "24.9",
+                    "buildVariables": ["NPM_TOKEN"], "runtimeVariables": [],
+                    "inputTokens": 41_877, "outputTokens": 2_318}})
+        } else if oom {
             json!({"phase": "Failed", "reason": "OutOfMemory",
                 "message": "buildkitd was killed for its memory. Set the annotation builder.zeabur.com/build-memory on the namespace to raise the limit."})
         } else if failed {
@@ -422,6 +440,19 @@ fn docs_build() -> [DynamicObject; 2] {
         serde_json::from_value(build).expect("a Build"),
         serde_json::from_value(run).expect("a BuildRun"),
     ]
+}
+
+/// The `agent` builder, ready, signing in with the key in each project's Secret `model`.
+fn agent_builder() -> DynamicObject {
+    serde_json::from_value(json!({
+        "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "ClusterBuilder",
+        "metadata": {"name": "agent"},
+        "spec": {"type": "agent", "agent": {"model": {"provider": "anthropic",
+            "model": "claude-sonnet-5-5",
+            "auth": {"type": "apiKey", "apiKey": {"name": "model", "key": "api-key"}}}}},
+        "status": {"conditions": [{"type": "Ready", "status": "True", "reason": "Ready"}]}
+    }))
+    .expect("a ClusterBuilder")
 }
 
 /// Lab's storefront, built from its Dockerfile, whose image declares a port the service has no
@@ -889,6 +920,13 @@ fn state() -> State {
                 "BuildRun",
                 true,
             ),
+            ServedResource::readable(
+                "builder.zeabur.com",
+                "v1alpha1",
+                "clusterbuilders",
+                "ClusterBuilder",
+                false,
+            ),
             ServedResource::readable("identity.zeabur.com", "v1alpha1", "users", "User", true),
             ServedResource::readable(
                 "identity.zeabur.com",
@@ -1265,7 +1303,7 @@ fn state() -> State {
         .into_iter()
         .chain(live)
         .chain(docs_build())
-        .chain([storefront_build()])
+        .chain([storefront_build(), agent_builder()])
         .chain([mongodb_community()])
         .chain(checkout_build())
         .chain(people())

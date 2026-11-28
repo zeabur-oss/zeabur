@@ -28,6 +28,7 @@ import {
   gitSourceOf,
   newGitService,
   newGitSource,
+  offeredMethods,
   parseRepository,
   pathProblem,
   repositoryProblems,
@@ -346,8 +347,8 @@ describe("the change", () => {
 
   test("Railpack builds are Strict and Dockerfile builds Compatible", () => {
     expect(newGitService().security).toBe("restricted")
-    expect(buildProfile("railpack")).toBe("restricted")
-    expect(buildProfile("dockerfile")).toBe("baseline")
+    expect(buildProfile("railpack", false)).toBe("restricted")
+    expect(buildProfile("dockerfile", true)).toBe("baseline")
   })
 
   test("a public URL sends its host; a new service listens on 8080", () => {
@@ -564,6 +565,25 @@ describe("the port of a method", () => {
   test("Railpack starts at 8080; a Dockerfile starts with no network", () => {
     expect(defaultPort("railpack")).toBe("8080")
     expect(defaultPort("dockerfile")).toBe("")
+  })
+})
+
+describe("the methods offered", () => {
+  test("the agent while its builder is ready, or for a service that builds with it", () => {
+    expect(offeredMethods(false)).toEqual(["railpack", "dockerfile"])
+    expect(offeredMethods(true)).toEqual(["railpack", "dockerfile", "agent"])
+    expect(offeredMethods(false, "agent")).toEqual(["railpack", "dockerfile", "agent"])
+  })
+})
+
+describe("the profile of an agent build", () => {
+  test("is Strict when the agent writes the Dockerfile, and Compatible for the folder's own", () => {
+    expect(buildProfile("agent", false)).toBe("restricted")
+    expect(buildProfile("agent", true)).toBe("baseline")
+  })
+
+  test("is Compatible when the files are unknown, as the repository may have a Dockerfile", () => {
+    expect(buildProfile("agent", undefined)).toBe("baseline")
   })
 })
 

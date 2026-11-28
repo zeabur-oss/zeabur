@@ -160,7 +160,8 @@ pub struct BuiltServiceChange {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<ServiceSize>,
     /// `restricted` or `baseline`. Left out: `restricted` for Railpack, whose images run as a
-    /// regular user, and `baseline` for a Dockerfile, which often runs as root.
+    /// regular user, and `baseline` for a Dockerfile, which often runs as root, and for the
+    /// agent, which builds the folder's own Dockerfile when it has one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub security: Option<PodSecurityLevel>,
     /// Its `Build`.
@@ -605,10 +606,7 @@ impl BuildInput {
     }
 
     const fn builder_ref(&self) -> &'static str {
-        match self.method {
-            BuildMethod::Railpack => "railpack",
-            BuildMethod::Dockerfile => "dockerfile",
-        }
+        self.method.builder_ref()
     }
 
     /// `spec.source` of the `Build` `name`, and the credentials Secret it reads, if any.
@@ -800,7 +798,10 @@ impl<'a> Planner<'a> {
             registry: None,
             security: change.security.unwrap_or(match change.build.method {
                 BuildMethod::Railpack => PodSecurityLevel::Restricted,
-                BuildMethod::Dockerfile => PodSecurityLevel::Baseline,
+                // The plan does not see the folder. The agent builds the folder's own Dockerfile
+                // as it is, which may run as root; the interface asks for `restricted` when the
+                // folder has none, as Zeabur Builder then checks that the image runs as non-root.
+                BuildMethod::Dockerfile | BuildMethod::Agent => PodSecurityLevel::Baseline,
             }),
             command: Vec::new(),
             args: Vec::new(),

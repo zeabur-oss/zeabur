@@ -5,18 +5,18 @@ import { useQuery } from "@tanstack/react-query"
 import { useId, useState, type ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 
-import { clusterQuery, creatableQuery } from "@/api/queries"
+import { buildsQuery, clusterQuery, creatableQuery } from "@/api/queries"
 import { ImageSizeField } from "@/components/add/image-size"
 import { SecurityProfileField } from "@/components/security-profile"
 import { useTakenNames } from "@/components/add/taken"
 import { FormField, TrimmedInput } from "@/components/form-field"
 import { useT } from "@/i18n"
 import {
-  buildMethods,
   buildProfile,
   defaultPort,
   derivedMethod,
   dockerfileAt,
+  offeredMethods,
   type BuildMethod,
   type BuiltService,
   type GitService,
@@ -66,6 +66,9 @@ export function resolveBuilt<F extends BuiltForm>(
     project: string
     suggested: string
     dockerfileFound: boolean
+    /** Whether the folder has a `Dockerfile` at its root, which the agent builds as it is;
+     * `undefined` when the form cannot tell. */
+    folderDockerfile: boolean | undefined
     options: ReturnType<typeof imageOptions>
     suffix: string | undefined
     env: ReturnType<typeof parseEnv>
@@ -80,7 +83,9 @@ export function resolveBuilt<F extends BuiltForm>(
   const publish = choices.published ? form.publicUrl : Boolean(context.suffix)
   const publicUrl = context.options.publicUrl && port !== "" && publish
   const host = choices.hosted ? form.host : suggestedHost(name, context.project, context.suffix)
-  const security = choices.securitySet ? form.security : buildProfile(method)
+  const security = choices.securitySet
+    ? form.security
+    : buildProfile(method, context.folderDockerfile)
   const resolved: F = {
     ...form,
     method,
@@ -101,8 +106,8 @@ export function useBuiltForm<F extends BuiltForm>(
   project: string,
   initial: () => F,
   suggested: (form: F, taken: string[]) => string,
-  /** Whether the repository or folder has a file at a path, when the form can tell. */
-  hasFile: (path: string) => boolean = () => false,
+  /** Whether the repository or folder has a file at a path; left out when the form cannot tell. */
+  hasFile?: (path: string) => boolean,
 ) {
   const cluster = useQuery(clusterQuery).data
   const domains = cluster?.domains ?? {}
@@ -125,13 +130,15 @@ export function useBuiltForm<F extends BuiltForm>(
     setChoices((c) => ({ ...c, [choice]: true }))
     set(patch)
   }
-  const dockerfileFound = hasFile(dockerfileAt(form.directory, form.dockerfile))
+  const dockerfileFound = hasFile?.(dockerfileAt(form.directory, form.dockerfile)) ?? false
+  const folderDockerfile = hasFile?.(dockerfileAt(form.directory, ""))
   const parsedEnv = parseEnv(env)
   const parsedBuildEnv = parseEnv(buildEnv)
   const derived = resolveBuilt(form, choices, {
     project,
     suggested: suggested(form, taken),
     dockerfileFound,
+    folderDockerfile,
     options,
     suffix: domains.suffixes?.[0],
     env: parsedEnv,
@@ -205,6 +212,13 @@ export function ServiceNameField({
   )
 }
 
+/** The methods the project's builds may use: the agent's while the cluster's agent builder is
+ * ready. */
+export function useOfferedMethods(project: string, current?: BuildMethod) {
+  const builds = useQuery({ ...buildsQuery(project), enabled: !!project, refetchInterval: false })
+  return offeredMethods(!!builds.data?.agent?.ready, current)
+}
+
 export function MethodField({
   built,
   source,
@@ -214,6 +228,7 @@ export function MethodField({
 }) {
   const t = useT()
   const method = built.method
+  const methods = useOfferedMethods(built.project, method)
   return (
     <FormField
       label={t("add.field.method")}
@@ -229,7 +244,7 @@ export function MethodField({
         size="sm"
         value={built.method}
         onValueChange={(method) => built.chooseMethod(method as BuildMethod)}
-        items={buildMethods.map((m) => ({ value: m, label: t(`add.method.${m}`) }))}
+        items={methods.map((m) => ({ value: m, label: t(`add.method.${m}`) }))}
       />
     </FormField>
   )
@@ -482,7 +497,7 @@ export function BuiltPort({ built, problems }: { built: BuiltFormState; problems
     <PortField
       value={built.portText}
       onChange={built.typePort}
-      hint={t(built.method === "railpack" ? "add.railpackPortHint" : "add.dockerfilePortHint")}
+      hint={t(`add.${built.method}PortHint`)}
       error={built.shown(problems.port, () => t("add.problem.port.invalid"))}
     />
   )

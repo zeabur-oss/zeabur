@@ -101,6 +101,39 @@ export const rules = {
     maxLength: 30,
     pattern: "^[a-z]([-a-z0-9]*[a-z0-9])?$",
   },
+  "PlanReport.buildVariables": {
+    default: [],
+  },
+  "PlanReport.detail": {
+    default: null,
+  },
+  "PlanReport.dockerfile": {
+    default: null,
+  },
+  "PlanReport.inputTokens": {
+    default: 0,
+  },
+  "PlanReport.language": {
+    default: null,
+  },
+  "PlanReport.modelCalled": {
+    default: false,
+  },
+  "PlanReport.outputTokens": {
+    default: 0,
+  },
+  "PlanReport.port": {
+    default: null,
+  },
+  "PlanReport.runtimeVariables": {
+    default: [],
+  },
+  "PlanReport.stopped": {
+    default: null,
+  },
+  "PlanReport.version": {
+    default: null,
+  },
   ProjectName: {
     maxLength: 63,
     pattern: "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",

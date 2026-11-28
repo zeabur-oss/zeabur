@@ -41,6 +41,7 @@ Under **Build with**, choose:
 
 - **Railpack**: Let the builder detect the app's language.
 - **Dockerfile**: Use the Dockerfile in the repository.
+- **Agent**: A model reads the repository and writes a Dockerfile. It shows only when the cluster's Zeabur Builder has the agent set up. See [Build with the agent](#build-with-the-agent).
 
 Under **More settings**, set **Root directory** to the folder to build, such as `apps/web`. When using Dockerfile, the path in the **Dockerfile** field is relative to this root directory. Leave it empty to use `Dockerfile`.
 
@@ -60,7 +61,7 @@ Under **More settings**, configure these separately:
 - **Environment variables**: Read by the container at runtime. Enter one `KEY=value` per line.
 - **Build variables**: Used only during the build, such as a token for downloading private packages. Values are passed as BuildKit secrets and aren't stored in the image. In a Dockerfile, read them with `RUN --mount=type=secret,id=KEY`.
 - **Size**: CPU and memory for the running service.
-- **Security**: Railpack images run as UID 1000 and default to **Strict**. Dockerfile builds default to **Compatible**. You can change this before creating the service. When building with a Dockerfile and choosing Strict, specify a non-root user with a numeric UID, such as `USER 1000`.
+- **Security**: Railpack images run as UID 1000 and default to **Strict**. Dockerfile builds default to **Compatible**. Agent builds default to **Compatible**, because the repository may have its own Dockerfile, which the agent builds as it is. An uploaded folder or ZIP file with no Dockerfile defaults to **Strict**: Zeabur Builder refuses a Dockerfile the model writes if its image runs as root. You can change this before creating the service. When building with a Dockerfile and choosing Strict, specify a non-root user with a numeric UID, such as `USER 1000`.
 
 </Step>
 <Step>
@@ -122,6 +123,18 @@ Zeabur Builder checks the branch every minute. When it finds a new commit, it bu
 To start a build now, select **Build again** in **Builds**, review the changes, and apply them. Zeabur Builder uses the branch's latest commit. To check the build result before it goes live, turn off **Auto-deploy new builds**. After the build succeeds, select **Deploy newest**, then review and apply the image change.
 
 To change the build folder, Dockerfile, or build variables, go to **Build** in the service's **Settings**. Changes take effect on the next build.
+
+## Build with the agent
+
+Use **Agent** for a repository that has no Dockerfile and that Railpack can't build. The first build asks a model to read the repository and write a Dockerfile, then builds it. Zeabur Builder saves that Dockerfile, and later builds reuse it without calling the model. When the repository has a Dockerfile of its own, the build uses it and doesn't call the model.
+
+**Agent** shows under **Build with** only after a cluster administrator sets up the agent in Zeabur Builder: the model, and how a build signs in to it. Each project also needs that sign-in, such as the Secret with the model key that the agent's settings name. Without it, the build stops and the **Builds** tab says what is missing. For the setup, see the [Zeabur Builder documentation](https://oss.zeabur.com/docs/builder/).
+
+**Agent plan** in the **Builds** tab shows the newest plan: whether the model wrote the Dockerfile, the language and port it found, the variables the app reads, and the model tokens it used. Zeabur OSS shows tokens, not cost; your model provider's prices give the cost. When the model stops without a Dockerfile, the section says why and what to change, such as the root directory.
+
+To have every build ask the model for a new Dockerfile, for example after the app's layout changed, turn on **Plan again on every build**. Each build then uses tokens. Turn it off to reuse the saved Dockerfile.
+
+To switch an existing service to the agent, select **Change repository** in the service's **Settings** → **Build** and choose **Agent** under **Build with**.
 
 ## Do the same with kubectl
 

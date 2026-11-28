@@ -42,7 +42,7 @@ description: 将电脑上的文件夹或 .zip 文件交给 Zeabur Builder 构建
 
 **名称**、**端口**、**公开域名**、**环境变量**、**构建变量**、**规格**和**安全性**的含义与[从 Git 部署](./git.mdx)相同。
 
-**构建方式**选择 **Railpack** 时，构建器会判断所用语言。选择 **Dockerfile** 时，使用文件夹最上层的 Dockerfile。要构建其中的某个子文件夹，在**更多设置**的**根目录**中填写其路径，例如 `apps/web`。
+**构建方式**选择 **Railpack** 时，构建器会判断所用语言。选择 **Dockerfile** 时，使用文件夹最上层的 Dockerfile。集群配置好 Agent 时，选择 **Agent** 会由模型写出 Dockerfile，见[用 Agent 构建](./git.mdx#用-agent-构建)。要构建其中的某个子文件夹，在**更多设置**的**根目录**中填写其路径，例如 `apps/web`。
 
 </Step>
 <Step>

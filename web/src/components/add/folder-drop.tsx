@@ -23,7 +23,13 @@ import { Spinner } from "@zeabur-oss/design-system/components/spinner"
 type FolderState =
   | { phase: "empty" }
   | { phase: "reading" }
-  | { phase: "ready"; packed: Packed; name: string; dockerfiles: Set<string> }
+  | {
+      phase: "ready"
+      packed: Packed
+      name: string
+      /** The `Dockerfile` paths in it; `undefined` for a `.tar.gz`, whose paths are not read. */
+      dockerfiles: Set<string> | undefined
+    }
   | { phase: "failed"; message: string }
 
 const ARCHIVE_PROBLEMS = {
@@ -82,7 +88,7 @@ export function useFolder() {
       setState(
         packed.files === 0
           ? { phase: "failed", message: t("upload.problem.empty") }
-          : { phase: "ready", packed, name, dockerfiles: new Set() },
+          : { phase: "ready", packed, name, dockerfiles: undefined },
       )
     } catch (error) {
       setState(fail(error))

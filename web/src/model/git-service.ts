@@ -16,7 +16,11 @@ type Change = Schemas.Change
 type EnvEdit = Schemas.EnvEdit
 
 export type BuildMethod = Schemas.BuildMethod
-export const buildMethods: BuildMethod[] = ["railpack", "dockerfile"]
+const buildMethods: BuildMethod[] = ["railpack", "dockerfile"]
+
+/** The methods to offer: the agent's only while its builder is ready, or when `current` is it. */
+export const offeredMethods = (agentReady: boolean, current?: BuildMethod): BuildMethod[] =>
+  agentReady || current === "agent" ? [...buildMethods, "agent"] : buildMethods
 
 /** `githubApp`: the cluster's GitHub App, through an installation granted to the project. */
 export type Access = "public" | "deployKey" | "token" | "githubApp"
@@ -92,10 +96,14 @@ export const newGitService = (): GitService => ({
   security: "restricted",
 })
 
-/** The profile a build's image suits: Railpack's images run as user 1000, a Dockerfile's as it
- * says, often root. */
-export const buildProfile = (method: BuildMethod): Profile =>
-  method === "railpack" ? "restricted" : "baseline"
+/** The profile a build's image suits: Railpack's images run as user 1000, and a Dockerfile's as
+ * it says, often root. The agent builds the folder's own Dockerfile when it has one; otherwise it
+ * writes one whose image runs as a numeric user other than root, as Zeabur Builder checks. When the
+ * form cannot see the files, as for a Git repository, the agent keeps the Dockerfile profile. */
+export const buildProfile = (method: BuildMethod, folderDockerfile: boolean | undefined): Profile =>
+  method === "railpack" || (method === "agent" && folderDockerfile === false)
+    ? "restricted"
+    : "baseline"
 
 const SEGMENT = /^[A-Za-z0-9._-]+$/
 const BRANCH = new RegExp(rules["BuildSource.git.branch"].pattern)
@@ -334,7 +342,7 @@ export const newGitSource = (method: BuildMethod = "railpack"): GitSource => ({
 
 /** How a Build builds, by its builder. */
 export const methodOf = (build: Build): BuildMethod =>
-  build.builder === "dockerfile" ? "dockerfile" : "railpack"
+  build.builder === "dockerfile" || build.builder === "agent" ? build.builder : "railpack"
 
 /** The branch a Build follows as the form takes it: empty for the repository's default. */
 const branchField = (ref: string | null | undefined) =>
