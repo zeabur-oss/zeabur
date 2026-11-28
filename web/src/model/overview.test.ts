@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import type { Schemas } from "@/api/client"
 import { en } from "@/i18n/en"
-import { eventWord, explainedBy, overviewOf, suggestionsOf } from "@/model/overview"
+import { eventWord, explainedBy, overviewOf, suggestionsOf, warningsAbout } from "@/model/overview"
 import type { Event } from "@/model/service"
 
 type Diagnosis = Schemas.Diagnosis
@@ -250,5 +250,17 @@ describe("a project's suggestions", () => {
   test("with every service checked, the gaps stay as they are", () => {
     const limits = gap("gap.resourceLimits.none", "CronJob", "nightly-report")
     expect(suggestionsOf([limits])).toEqual([{ as: "gap", gap: limits }])
+  })
+})
+
+describe("the warnings on a map node", () => {
+  const gap = (severity: Schemas.Gap["severity"], kind: string, name: string) =>
+    ({ severity, subject: { kind, name }, rule: "r" }) as unknown as Schemas.Gap
+
+  test("are the warnings about that object, not its advice or another object's", () => {
+    const db = gap("warning", "Cluster", "pg")
+    const gaps = [db, gap("advice", "Cluster", "pg"), gap("warning", "Cluster", "other")]
+    expect(warningsAbout(gaps, { kind: "Cluster", name: "pg" })).toStrictEqual([db])
+    expect(warningsAbout(gaps, { kind: "Deployment", name: "pg" })).toStrictEqual([])
   })
 })

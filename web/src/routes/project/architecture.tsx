@@ -18,6 +18,7 @@ import PlusIcon from "~icons/ph/plus"
 import { projectQuery } from "@/api/queries"
 import { Hint } from "@/components/bits"
 import { EngineVersion, useDatabases } from "@/components/databases"
+import { NodeWarnings } from "@/components/gaps"
 import { Badge } from "@zeabur-oss/design-system/components/badge"
 import { usePresence } from "@zeabur-oss/design-system/components/presence"
 import { Amount } from "@/components/amount-input"
@@ -41,6 +42,7 @@ import {
   imageTag,
   serviceId,
   statusOf,
+  type Health,
   volumesOf,
   type Project,
   type Service,
@@ -375,6 +377,7 @@ function Graph({
           return node.service ? (
             <ServiceCard
               key={node.id}
+              project={project}
               node={node}
               service={node.service}
               host={domainsOf(data, node.service)[0]?.host}
@@ -489,6 +492,7 @@ function Graph({
 }
 
 function ServiceCard({
+  project,
   node,
   service,
   selected,
@@ -498,6 +502,7 @@ function ServiceCard({
   word,
   host,
 }: {
+  project: string
   node: LaidNode
   service: Service
   host?: string
@@ -507,10 +512,8 @@ function ServiceCard({
   onHover: (on: boolean) => void
   word: ReturnType<typeof useStatusWord>
 }) {
-  const t = useT()
   const status = statusOf(service)
   const volumes = volumesOf(service)
-  const first = service.diagnoses?.[0]
   return (
     <div
       data-node
@@ -554,18 +557,7 @@ function ServiceCard({
             />
           ) : null}
         </span>
-        {first || service.kind === "CronJob" ? (
-          <span className="flex min-w-0 gap-1">
-            {service.kind === "CronJob" ? (
-              <Badge variant="secondary">{t("lane.scheduled")}</Badge>
-            ) : null}
-            {first ? (
-              <Badge variant={troubleTone(status.health)}>
-                {t(`origin.${originOf(first).origin}`)}
-              </Badge>
-            ) : null}
-          </span>
-        ) : null}
+        <CardBadges service={service} health={status.health} />
         <span className="mt-auto flex items-center gap-2 text-xs">
           <StatusDot health={status.health} />
           <span className={cn("truncate font-medium", status.health === "fail" && "text-fail")}>
@@ -578,10 +570,27 @@ function ServiceCard({
           ) : null}
         </span>
       </button>
+      <NodeWarnings project={project} object={service} />
       {volumes.map((m) => (
         <VolumeChip key={claimOf(m)} name={claimOf(m)} size={m.size} />
       ))}
     </div>
+  )
+}
+
+/** A CronJob's schedule and where its first diagnosis comes from. */
+function CardBadges({ service, health }: { service: Service; health: Health }) {
+  const t = useT()
+  const first = service.diagnoses?.[0]
+  const scheduled = service.kind === "CronJob"
+  if (!first && !scheduled) return null
+  return (
+    <span className="flex min-w-0 gap-1">
+      {scheduled ? <Badge variant="secondary">{t("lane.scheduled")}</Badge> : null}
+      {first ? (
+        <Badge variant={troubleTone(health)}>{t(`origin.${originOf(first).origin}`)}</Badge>
+      ) : null}
+    </span>
   )
 }
 
@@ -653,6 +662,7 @@ function DatabaseCard({
           </span>
         </span>
       </Link>
+      <NodeWarnings project={project} object={database} />
       {volumes.map((volume) => (
         <VolumeChip key={volume.name} name={volume.name} size={volume.size} />
       ))}

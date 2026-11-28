@@ -2210,6 +2210,7 @@ export const en = {
   "diagnosis.action.security": "Security",
   "gap.title": "Missing setup",
   "gap.warning": "Warning",
+  "gap.nodeWarnings": (n: number) => `Show ${plural(n, "warning", "warnings")}`,
   "gap.advice": "Advice",
   "gap.unchecked": (count: number) =>
     `${count} ${count === 1 ? "service has" : "services have"} no traffic check`,

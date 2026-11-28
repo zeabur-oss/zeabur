@@ -166,3 +166,12 @@ export function suggestionsOf(gaps: Gap[]): Suggestion[] {
   if (unchecked.size > 0) rows.push({ as: "unchecked", services: [...unchecked.values()] })
   return rows
 }
+
+/** The warnings about one object on the map, a workload or a database, by its kind and name. */
+export const warningsAbout = (gaps: Gap[], object: { kind: string; name: string }): Gap[] =>
+  gaps.filter(
+    (gap) =>
+      gap.severity === "warning" &&
+      gap.subject.kind === object.kind &&
+      gap.subject.name === object.name,
+  )
