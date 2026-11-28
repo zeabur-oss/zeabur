@@ -21,6 +21,7 @@ const resolve = (suffix: string | undefined, choices: Partial<Choices> = {}, pub
       project: "shop",
       suggested: "web",
       dockerfileFound: false,
+      folderDockerfile: false,
       options: { deploy: true, port: true, publicUrl: true, secrets: true, volume: true },
       suffix,
       env: parseEnv(""),
@@ -42,5 +43,31 @@ describe("the public domain of a Git or folder service", () => {
   test("follows the switch once the person turns it on or off", () => {
     expect(resolve(undefined, { published: true }, true).publicUrl).toBe(true)
     expect(resolve("apps.example.com", { published: true }, false).publicUrl).toBe(false)
+  })
+})
+
+describe("the security profile of an agent build", () => {
+  const agent = (folderDockerfile: boolean) =>
+    resolveBuilt(
+      { ...newGitService(), method: "agent" },
+      { ...untouched, methoded: true },
+      {
+        project: "shop",
+        suggested: "web",
+        dockerfileFound: folderDockerfile,
+        folderDockerfile,
+        options: { deploy: true, port: true, publicUrl: true, secrets: true, volume: true },
+        suffix: undefined,
+        env: parseEnv(""),
+        buildEnv: parseEnv(""),
+      },
+    ).security
+
+  test("starts Strict when the agent writes the Dockerfile", () => {
+    expect(agent(false)).toBe("restricted")
+  })
+
+  test("starts Compatible when the folder has a Dockerfile the agent builds as it is", () => {
+    expect(agent(true)).toBe("baseline")
   })
 })

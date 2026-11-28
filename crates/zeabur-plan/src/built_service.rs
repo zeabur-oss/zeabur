@@ -160,7 +160,8 @@ pub struct BuiltServiceChange {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<ServiceSize>,
     /// `restricted` or `baseline`. Left out: `restricted` for Railpack, whose images run as a
-    /// regular user, and `baseline` for a Dockerfile, which often runs as root.
+    /// regular user, and `baseline` for a Dockerfile, which often runs as root, and for the
+    /// agent, which builds the folder's own Dockerfile when it has one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub security: Option<PodSecurityLevel>,
     /// Its `Build`.
@@ -797,7 +798,9 @@ impl<'a> Planner<'a> {
             registry: None,
             security: change.security.unwrap_or(match change.build.method {
                 BuildMethod::Railpack => PodSecurityLevel::Restricted,
-                // The image's user is not known before the model writes the Dockerfile.
+                // The plan does not see the folder. The agent builds the folder's own Dockerfile
+                // as it is, which may run as root; the interface asks for `restricted` when the
+                // folder has none, as Zeabur Builder then checks that the image runs as non-root.
                 BuildMethod::Dockerfile | BuildMethod::Agent => PodSecurityLevel::Baseline,
             }),
             command: Vec::new(),

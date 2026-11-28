@@ -5681,7 +5681,8 @@ components:
           - $ref: "#/components/schemas/PodSecurityLevel"
             description: |-
               `restricted` or `baseline`. Left out: `restricted` for Railpack, whose images run as a
-              regular user, and `baseline` for a Dockerfile, which often runs as root.
+              regular user, and `baseline` for a Dockerfile, which often runs as root, and for the
+              agent, which builds the folder's own Dockerfile when it has one.
           - type: "null"
         size:
           oneOf:

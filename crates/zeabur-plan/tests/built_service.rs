@@ -723,7 +723,6 @@ mod tests {
     }
     /// A service built by the agent names the `agent` `ClusterBuilder`; build options turn a
     /// fresh plan on and off.
-    /// Build to it and back, and turn a fresh plan on and off.
     #[test]
     fn the_agent_builder_and_a_fresh_plan() {
         let mut agent = git();

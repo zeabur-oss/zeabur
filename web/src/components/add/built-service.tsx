@@ -66,6 +66,8 @@ export function resolveBuilt<F extends BuiltForm>(
     project: string
     suggested: string
     dockerfileFound: boolean
+    /** Whether the folder has a `Dockerfile` at its root, which the agent builds as it is. */
+    folderDockerfile: boolean
     options: ReturnType<typeof imageOptions>
     suffix: string | undefined
     env: ReturnType<typeof parseEnv>
@@ -80,7 +82,9 @@ export function resolveBuilt<F extends BuiltForm>(
   const publish = choices.published ? form.publicUrl : Boolean(context.suffix)
   const publicUrl = context.options.publicUrl && port !== "" && publish
   const host = choices.hosted ? form.host : suggestedHost(name, context.project, context.suffix)
-  const security = choices.securitySet ? form.security : buildProfile(method)
+  const security = choices.securitySet
+    ? form.security
+    : buildProfile(method, context.folderDockerfile)
   const resolved: F = {
     ...form,
     method,
@@ -126,12 +130,14 @@ export function useBuiltForm<F extends BuiltForm>(
     set(patch)
   }
   const dockerfileFound = hasFile(dockerfileAt(form.directory, form.dockerfile))
+  const folderDockerfile = hasFile(dockerfileAt(form.directory, ""))
   const parsedEnv = parseEnv(env)
   const parsedBuildEnv = parseEnv(buildEnv)
   const derived = resolveBuilt(form, choices, {
     project,
     suggested: suggested(form, taken),
     dockerfileFound,
+    folderDockerfile,
     options,
     suffix: domains.suffixes?.[0],
     env: parsedEnv,

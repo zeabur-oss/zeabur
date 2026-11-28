@@ -347,8 +347,8 @@ describe("the change", () => {
 
   test("Railpack builds are Strict and Dockerfile builds Compatible", () => {
     expect(newGitService().security).toBe("restricted")
-    expect(buildProfile("railpack")).toBe("restricted")
-    expect(buildProfile("dockerfile")).toBe("baseline")
+    expect(buildProfile("railpack", false)).toBe("restricted")
+    expect(buildProfile("dockerfile", true)).toBe("baseline")
   })
 
   test("a public URL sends its host; a new service listens on 8080", () => {
@@ -573,7 +573,13 @@ describe("the methods offered", () => {
     expect(offeredMethods(false)).toEqual(["railpack", "dockerfile"])
     expect(offeredMethods(true)).toEqual(["railpack", "dockerfile", "agent"])
     expect(offeredMethods(false, "agent")).toEqual(["railpack", "dockerfile", "agent"])
-    expect(buildProfile("agent")).toBe("baseline")
+  })
+})
+
+describe("the profile of an agent build", () => {
+  test("is Strict when the agent writes the Dockerfile, and Compatible for the folder's own", () => {
+    expect(buildProfile("agent", false)).toBe("restricted")
+    expect(buildProfile("agent", true)).toBe("baseline")
   })
 })
 
