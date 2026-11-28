@@ -41,12 +41,12 @@ pub use built_service::{
 };
 pub use certificates::{CheckedCertificate, IssuerRead, own_secret_name};
 pub use change::{
-    AddDomainChange, BasicAuthUser, BuildMethod, BuildOptionsChange, CertificateChange,
-    CertificateSource, Change, ConnectionRef, CopyS3KeysChange, DataEdit, DataKind,
-    EgressLimitChange, EnvImportChange, ErrorPageHtml, FieldOwners, GatewayParent, HttpOnlyReason,
-    IpAllowChange, KeptReason, LabelVolumeChange, NameValue, ObjectName, Plan, PlanRequest,
-    PlannedObject, ProbeKind, PublicPortChange, RouteKind, RouteRef, ServiceSize, Target,
-    TemplateChange, Update, Warning, Write,
+    AddDomainChange, AutoUpdateClusterKind, AutoUpdateTarget, BasicAuthUser, BuildMethod,
+    BuildOptionsChange, CertificateChange, CertificateSource, Change, ConnectionRef,
+    CopyS3KeysChange, DataEdit, DataKind, EgressLimitChange, EnvImportChange, ErrorPageHtml,
+    FieldOwners, GatewayParent, HttpOnlyReason, IpAllowChange, KeptReason, LabelVolumeChange,
+    NameValue, ObjectName, Plan, PlanRequest, PlannedObject, ProbeKind, PublicPortChange,
+    RouteKind, RouteRef, ServiceSize, Target, TemplateChange, Update, Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};

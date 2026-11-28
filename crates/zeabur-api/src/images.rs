@@ -13,7 +13,7 @@
 //! A registry that cannot be read is an answer, not an error: deploying never waits on it.
 //! Answers are kept for a few minutes, per credential.
 
-mod reference;
+use zeabur_model::adapters::image_reference as reference;
 pub mod registry;
 mod transport;
 

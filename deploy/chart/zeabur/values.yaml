@@ -220,6 +220,17 @@ proxy:
     limits:
       memory: 64Mi
 
+# An independently permissioned CloudNativePG updater, using the Zeabur server image.
+# Install CloudNativePG first. Enabling this does not opt any database into updates.
+databaseUpdater:
+  enabled: false
+  scanInterval: 15s
+  # Development registries only; TLS verification is never disabled.
+  httpRegistries: []
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 256Mi}
+
 service:
   type: ClusterIP
   port: 80

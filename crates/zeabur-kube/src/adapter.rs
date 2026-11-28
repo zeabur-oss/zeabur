@@ -380,6 +380,18 @@ fn all_refused(
     Ok(objects)
 }
 
+async fn named_secret(
+    client: &UserClient,
+    namespace: &str,
+    name: &str,
+) -> Result<Secret, ClusterError> {
+    names::namespace(namespace)?;
+    names::name(name)?;
+    Ok(Api::<Secret>::namespaced(client.kube().clone(), namespace)
+        .get(name)
+        .await?)
+}
+
 impl Cluster for UserClient {
     fn whoami(&self) -> Answer<'_, Identity> {
         Box::pin(async move {
@@ -648,11 +660,7 @@ impl Cluster for UserClient {
         name: &'a str,
     ) -> Answer<'a, BTreeMap<String, Vec<u8>>> {
         Box::pin(async move {
-            names::namespace(namespace)?;
-            names::name(name)?;
-            let secret = Api::<Secret>::namespaced(self.kube().clone(), namespace)
-                .get(name)
-                .await?;
+            let secret = named_secret(self, namespace, name).await?;
             let mut values: BTreeMap<String, Vec<u8>> = secret
                 .data
                 .unwrap_or_default()
@@ -666,6 +674,23 @@ impl Cluster for UserClient {
                     .into_iter()
                     .map(|(k, v)| (k, v.into_bytes())),
             );
+            Ok(values)
+        })
+    }
+
+    fn pull_secret<'a>(
+        &'a self,
+        namespace: &'a str,
+        name: &'a str,
+    ) -> Answer<'a, BTreeMap<String, Vec<u8>>> {
+        Box::pin(async move {
+            let secret = named_secret(self, namespace, name).await?;
+            let mut values = BTreeMap::new();
+            if let Some(key) = crate::secrets::docker_key(secret.type_.as_deref())
+                && let Some(value) = secret.data.and_then(|mut data| data.remove(key))
+            {
+                values.insert(key.to_owned(), value.0);
+            }
             Ok(values)
         })
     }

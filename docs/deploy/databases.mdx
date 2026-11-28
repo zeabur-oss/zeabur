@@ -79,6 +79,14 @@ After applying the changes, open the database, wait for **Ready**, and check the
 
 The database's **Connections** section shows an address inside the cluster. To configure an app manually, copy the **Host**, **Port**, **Database**, and **Username**. If you have permission to read secrets, select **Show** next to the password. Then write a test record from the app and read it back to verify the connection and permissions.
 
+## Automatically refresh a PostgreSQL image
+
+An administrator enables `databaseUpdater.enabled: true` in the Zeabur Helm chart. The database settings show when the updater is ready.
+
+For a directly managed CloudNativePG database, open **Settings** → **Automatic updates**, choose **New image under the same tag** and a schedule, then review and apply. Use a major-version rolling tag such as `17-standard-trixie`. The updater keeps that repository and tag and replaces its digest when the registry changes it. It does not select another PostgreSQL major, image flavor or catalog entry.
+
+Choose a time in your time zone; the fields show the saved schedule in UTC. The schedule controls when checks begin, and CloudNativePG performs the rollout afterwards. Restarting the updater waits for the next check. Keep working backups and monitor database readiness; a failed rollout is not automatically rolled back. Select **Off** to stop future checks, including when the updater is unavailable. Turning it off does not undo an update already applied.
+
 ## Set up S3 backups
 
 PostgreSQL, MongoDB, MySQL and MariaDB can back up to S3. Dragonfly has no **Backups**. It keeps its data in snapshots on its volume and loads the newest one when it starts.

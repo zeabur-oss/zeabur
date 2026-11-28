@@ -31,7 +31,7 @@ use zeabur_kube::{
 };
 
 /// The service account token of this pod, which kubelet renews.
-const TOKEN_FILE: &str = "/var/run/secrets/kubernetes.io/serviceaccount/token";
+pub(crate) const TOKEN_FILE: &str = "/var/run/secrets/kubernetes.io/serviceaccount/token";
 /// How long to wait before asking for the plan again.
 const POLL: Duration = Duration::from_secs(3);
 /// The largest answer read.
@@ -75,7 +75,7 @@ struct InstallArgs {
 }
 
 /// A time limit such as `90s`, `10m` or `1h30m`, in jiff's friendly format.
-fn duration(text: &str) -> Result<Duration, String> {
+pub(crate) fn duration(text: &str) -> Result<Duration, String> {
     text.parse::<SignedDuration>()
         .ok()
         .and_then(|limit| Duration::try_from(limit).ok())

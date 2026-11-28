@@ -130,6 +130,7 @@ pub fn database(namespace: &str, store: &DynamicObject) -> Database {
         object: databases::written(store),
         pods: Vec::new(),
         restored: databases::restored(store),
+        image_updates: None,
         unmanaged: false,
         name,
     }

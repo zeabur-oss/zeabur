@@ -434,6 +434,25 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/database-updater:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        The updater's live Deployment state. Reads only the public locator and its named Deployment,
+        with the person's credential; an unreadable object is unknown, not missing.
+      operationId: getDatabaseUpdater
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabaseUpdater"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/events:
     get:
       tags:
@@ -4894,6 +4913,30 @@ components:
         ownership:
           $ref: "#/components/schemas/Ownership"
           description: Owned, shared or orphan.
+    AutoUpdateClusterKind:
+      type: string
+      description: The database kind accepted by [`AutoUpdateTarget`].
+      enum:
+      - Cluster
+    AutoUpdateTarget:
+      oneOf:
+      - $ref: "#/components/schemas/WorkloadRef"
+        description: A service's workload.
+      - type: object
+        description: A `postgresql.cnpg.io/v1` Cluster.
+        required:
+        - kind
+        - name
+        properties:
+          kind:
+            $ref: "#/components/schemas/AutoUpdateClusterKind"
+            description: The CloudNativePG kind.
+          name:
+            type: string
+            description: The Cluster's name.
+      description: >-
+        The existing service targets, or a CloudNativePG Cluster, whose Keel settings
+        change.
     BackupCoverage:
       type: object
       description: One target's coverage across providers.
@@ -6473,7 +6516,7 @@ components:
           Set what a Zeabur Builder `Build` builds: its directory, its Dockerfile and its build
           variables (see the `builds` module).
       - type: object
-        description: Have Keel move a workload to new images, or stop it (see the `builds` module).
+        description: Have Keel move a workload or CloudNativePG Cluster to new images, or stop it.
         required:
         - workload
         - update
@@ -6487,8 +6530,8 @@ components:
             $ref: "#/components/schemas/Update"
             description: Which updates, if any.
           workload:
-            $ref: "#/components/schemas/WorkloadRef"
-            description: "The workload: a Deployment, StatefulSet or DaemonSet."
+            $ref: "#/components/schemas/AutoUpdateTarget"
+            description: A service's workload, or a CloudNativePG Cluster.
       - type: object
         description: Run this many pods of a Deployment or StatefulSet.
         required:
@@ -8713,6 +8756,13 @@ components:
           - string
           - "null"
           description: The server image.
+        imageUpdates:
+          oneOf:
+          - $ref: "#/components/schemas/ImageUpdates"
+            description: >-
+              The image settings that can be managed here, when supported by the database and
+              its owner.
+          - type: "null"
         kind:
           type: string
           description: The object's kind.
@@ -9092,6 +9142,34 @@ components:
       - degraded
       - failed
       - paused
+      - unknown
+    DatabaseUpdater:
+      type: object
+      description: The native state of the chart-owned database updater.
+      required:
+      - status
+      - message
+      properties:
+        message:
+          type: string
+          description: >-
+            A safe explanation without the cluster's connection details or Deployment
+            contents.
+        problem:
+          oneOf:
+          - $ref: "#/components/schemas/Problem"
+            description: Why the state could not be checked, including permission refusals.
+          - type: "null"
+        status:
+          $ref: "#/components/schemas/DatabaseUpdaterStatus"
+          description: Whether it is installed and ready.
+    DatabaseUpdaterStatus:
+      type: string
+      description: Whether automatic database updates can be enabled.
+      enum:
+      - missing
+      - notReady
+      - ready
       - unknown
     DebugContainerStatus:
       type: object

@@ -1,10 +1,15 @@
+import { execFileSync } from "node:child_process"
+import { fileURLToPath } from "node:url"
+
 import type { Page } from "@playwright/test"
+import type { ProjectDatabases } from "../../src/api/zeabur.ts"
 
 import { expect, test } from "../fixtures.ts"
 import { invite, member, planAndApply, signInAdmin, toast } from "./members.ts"
 
-// Databases by role: a Developer creates a database, backs it up to S3 and backs it up now; a
-// Viewer of the same project sees it but cannot back it up or read its password.
+// Databases by role: a Developer creates and backs up databases and configures PostgreSQL image
+// updates; a Viewer sees them but cannot back them up, change updates or read passwords.
+// Image-update settings need the chart's database updater enabled.
 // scripts/e2e-browser.sh sets, besides ZEABUR_E2E_URL and ZEABUR_E2E_NAMESPACE:
 //
 //   ZEABUR_E2E_DB_ADMIN_LINK   an invitation for `e2e-db-admin`, an admin account (`invite --admin`;
@@ -81,6 +86,38 @@ const engines = [
 ]
 const databasePage = (path: string, name: string) =>
   `/projects/${encodeURIComponent(project)}/databases/${path}/${name}`
+const lastAppliedKey = "kubectl.kubernetes.io/last-applied-configuration"
+
+/** Fixture writes use only the canonical disposable cluster, never a default kubeconfig. */
+const kubectl = (...args: string[]) =>
+  execFileSync(
+    "kubectl",
+    [
+      "--kubeconfig",
+      fileURLToPath(new URL("../../../target/dev-cluster/kubeconfig", import.meta.url)),
+      "--context",
+      "k3d-zeabur-dev",
+      "--namespace",
+      project,
+      ...args,
+    ],
+    { encoding: "utf8", timeout: 30_000 },
+  )
+
+async function postgresObject(page: Page) {
+  const response = await page.request.get(
+    `/api/v1/projects/${encodeURIComponent(project)}/databases`,
+  )
+  expect(response.status()).toBe(200)
+  const body = (await response.json()) as ProjectDatabases
+  const database = body.items.find((db) => db.engine === "postgresql" && db.name === postgres)
+  expect(database).toBeDefined()
+  return database!.object as {
+    metadata: { annotations?: Record<string, string>; resourceVersion: string }
+    spec: { imageName: string; storage: { size: string }; plugins: unknown[] }
+    status?: { phaseReason?: string }
+  }
+}
 
 /** The project's claims whose names start with `prefix`. */
 async function claimsOf(page: Page, prefix: string): Promise<string[]> {
@@ -230,6 +267,153 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
     })
   }
 
+  await test.step("the Developer saves and disables PostgreSQL image updates without changing its spec", async () => {
+    const readiness = await developer.request.get("/api/v1/cluster/database-updater")
+    expect(readiness.status()).toBe(200)
+    expect(await readiness.json()).toMatchObject({ status: "ready" })
+    const existing = await postgresObject(developer)
+    const lastApplied = JSON.stringify({
+      apiVersion: "postgresql.cnpg.io/v1",
+      kind: "Cluster",
+      metadata: { name: postgres },
+      spec: existing.spec,
+    })
+    kubectl(
+      "patch",
+      "clusters.postgresql.cnpg.io",
+      postgres,
+      "--type=json",
+      "--patch",
+      JSON.stringify([
+        {
+          op: "add",
+          path: "/metadata/annotations",
+          value: { [lastAppliedKey]: lastApplied },
+        },
+      ]),
+    )
+    const before = await postgresObject(developer)
+    expect(before.metadata.annotations).toEqual({ [lastAppliedKey]: lastApplied })
+    expect(before.spec.imageName).toBeTruthy()
+    expect(before.spec.storage.size).toBe("1Gi")
+    expect(before.spec.plugins.length).toBeGreaterThan(0)
+    // Keep registry checks outside this settings test's window.
+    const schedule = await developer.evaluate(() => {
+      const at = new Date(Date.now() + 12 * 60 * 60 * 1000)
+      at.setUTCMinutes(0, 0, 0)
+      return {
+        time: `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`,
+        cron: `0 0 ${at.getUTCHours()} * * *`,
+        hour: at.getUTCHours(),
+      }
+    })
+    await developer.goto(databasePage("postgresql", postgres))
+    await developer.getByRole("tab", { name: "Settings" }).click()
+    const updates = developer.getByRole("region", { name: "Automatic updates", exact: true })
+    await expect(updates).toContainText("Automatic database updates are ready.")
+    const policy = updates.getByRole("combobox", { name: "Which versions" })
+    await expect(policy).toHaveText("Off")
+    await policy.click()
+    await developer.getByRole("option", { name: "New image under the same tag" }).click()
+    await updates.getByRole("combobox", { name: "When", exact: true }).click()
+    await developer.getByRole("option", { name: "Every day", exact: true }).click()
+    await updates.getByRole("combobox", { name: "Time", exact: true }).click()
+    await developer.getByRole("option", { name: schedule.time, exact: true }).click()
+    const shown = await postgresObject(developer)
+    const phaseReason = `Image update regression ${suffix}`
+    const churned = JSON.parse(
+      kubectl(
+        "patch",
+        "clusters.postgresql.cnpg.io",
+        postgres,
+        "--subresource=status",
+        "--type=merge",
+        "--patch",
+        JSON.stringify({ status: { phaseReason } }),
+        "-o",
+        "json",
+      ),
+    ) as Awaited<ReturnType<typeof postgresObject>>
+    expect(churned.status?.phaseReason).toBe(phaseReason)
+    expect(churned.metadata.resourceVersion).not.toBe(shown.metadata.resourceVersion)
+    expect(churned.spec).toEqual(before.spec)
+    const planned = developer.waitForRequest(
+      (request) =>
+        request.method() === "POST" &&
+        new URL(request.url()).pathname === `/api/v1/projects/${encodeURIComponent(project)}/plan`,
+    )
+    await updates.getByRole("button", { name: "Review changes", exact: true }).click()
+    expect((await planned).postDataJSON().changes).toEqual([
+      {
+        op: "autoUpdate",
+        workload: { kind: "Cluster", name: postgres },
+        update: { kind: "image", policy: "sameTag", window: { hour: schedule.hour } },
+      },
+    ])
+    await expect(developer.getByRole("dialog", { name: "Automatic updates" })).toContainText(
+      postgres,
+    )
+    await apply(developer, "Automatic updates")
+
+    const enabled = await postgresObject(developer)
+    expect(enabled.spec).toEqual(before.spec)
+    expect(enabled.metadata.annotations).toMatchObject({
+      ...before.metadata.annotations,
+      "keel.sh/policy": "force",
+      "keel.sh/trigger": "poll",
+      "keel.sh/match-tag": "true",
+      "keel.sh/pollSchedule": schedule.cron,
+    })
+    await developer.reload()
+    await expect(policy).toHaveText("New image under the same tag")
+    await expect(updates.getByRole("combobox", { name: "When", exact: true })).toHaveText(
+      "Every day",
+    )
+    await expect(updates.getByRole("combobox", { name: "Time", exact: true })).toHaveText(
+      schedule.time,
+    )
+    await expect(
+      updates.getByRole("button", { name: "Review changes", exact: true }),
+    ).toBeDisabled()
+    await policy.click()
+    await developer.getByRole("option", { name: "Off", exact: true }).click()
+    await updates.getByRole("button", { name: "Review changes", exact: true }).click()
+    await apply(developer, "Automatic updates")
+    const disabled = await postgresObject(developer)
+    expect(disabled.spec).toEqual(before.spec)
+    expect(disabled.metadata.annotations).toMatchObject(before.metadata.annotations ?? {})
+    for (const key of ["policy", "trigger", "match-tag", "matchTag", "pollSchedule"]) {
+      expect(disabled.metadata.annotations?.[`keel.sh/${key}`]).toBeUndefined()
+    }
+    await developer.reload()
+    await expect(policy).toHaveText("Off")
+  })
+
+  await test.step("Helm owns the schedule of a Helm-managed database", async () => {
+    const resource = "clusters.postgresql.cnpg.io"
+    const label = "app.kubernetes.io/managed-by"
+    const before = await postgresObject(developer)
+    kubectl("label", resource, postgres, `${label}=Helm`)
+    try {
+      await developer.reload()
+      await expect(developer.locator("section#compute")).toBeVisible()
+      await expect(
+        developer.getByRole("region", { name: "Automatic updates", exact: true }),
+      ).toHaveCount(0)
+      const refused = await planAndApply(developer, project, [
+        {
+          op: "autoUpdate",
+          workload: { kind: "Cluster", name: postgres },
+          update: { kind: "image", policy: "sameTag" },
+        },
+      ])
+      expect(refused).toMatchObject({ stage: "plan", status: 409, body: { managedBy: "Helm" } })
+      expect((await postgresObject(developer)).spec).toEqual(before.spec)
+    } finally {
+      kubectl("label", resource, postgres, `${label}-`)
+    }
+  })
+
   await test.step("the Viewer sees the databases but cannot back them up or read passwords", async () => {
     const viewer = await member(browser, viewerLink, "e2e-db-viewer", zeabur)
     for (const db of engines) {
@@ -256,6 +440,31 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
 
       const refused = await planAndApply(viewer, project, [{ op: "create", object: db.backup }])
       expect(refused.status, JSON.stringify(refused.body)).toBe(403)
+      if (db.path === "postgresql") {
+        const readiness = await viewer.request.get("/api/v1/cluster/database-updater")
+        expect(readiness.status()).toBe(200)
+        expect(await readiness.json()).toMatchObject({ status: "ready" })
+        await viewer.getByRole("tab", { name: "Settings" }).click()
+        const updates = viewer.getByRole("region", { name: "Automatic updates", exact: true })
+        await expect(updates).toContainText("Automatic database updates are ready.")
+        await expect(updates.getByRole("combobox", { name: "Which versions" })).toBeDisabled()
+        await expect(
+          updates.getByRole("button", { name: "Review changes", exact: true }),
+        ).toBeDisabled()
+        await expect(updates).toContainText("Needs Developer access")
+        const before = await postgresObject(viewer)
+        const refused = await planAndApply(viewer, project, [
+          {
+            op: "autoUpdate",
+            workload: { kind: "Cluster", name: db.name },
+            update: { kind: "image", policy: "sameTag" },
+          },
+        ])
+        expect(refused.status, JSON.stringify(refused.body)).toBe(403)
+        const after = await postgresObject(developer)
+        expect(after.spec).toEqual(before.spec)
+        expect(after.metadata.annotations).toEqual(before.metadata.annotations)
+      }
     }
     await viewer.context().close()
   })

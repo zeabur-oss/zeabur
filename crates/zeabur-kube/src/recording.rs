@@ -163,6 +163,15 @@ impl<C: Cluster> Cluster for Recording<C> {
         self.inner.reveal_secret(namespace, name)
     }
 
+    fn pull_secret<'a>(
+        &'a self,
+        namespace: &'a str,
+        name: &'a str,
+    ) -> Answer<'a, BTreeMap<String, Vec<u8>>> {
+        self.note(format!("pull_secret {namespace}/{name}"));
+        self.inner.pull_secret(namespace, name)
+    }
+
     fn request_token<'a>(
         &'a self,
         namespace: &'a str,

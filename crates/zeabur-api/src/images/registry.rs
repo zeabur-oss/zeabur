@@ -26,7 +26,7 @@ use serde::Deserialize;
 use sha2::{Digest as _, Sha256};
 use zeabur_core::secret;
 
-use super::reference::Reference;
+use super::reference::{Reference, valid_digest};
 
 const INDEX_TYPES: [&str; 2] = [
     "application/vnd.oci.image.index.v1+json",
@@ -158,6 +158,8 @@ struct Session<'a> {
     transport: &'a dyn Transport,
     reference: &'a Reference,
     base: String,
+    /// The scheduled updater allows plain HTTP only at the explicitly configured origin.
+    restrict_http: bool,
     credential: Option<&'a Credential>,
     authorization: Option<SecretString>,
 }
@@ -175,52 +177,19 @@ pub(crate) async fn inspect(
         transport,
         reference,
         base,
+        restrict_http: false,
         credential,
         authorization: None,
     };
-    let accept = [INDEX_TYPES, MANIFEST_TYPES].concat().join(", ");
-    let pinned = reference.tag.starts_with("sha256:");
-    let answer = session
-        .fetch(
-            &manifest_path(reference, &reference.tag),
-            &accept,
-            MANIFEST_LIMIT,
-        )
-        .await?;
-    if pinned {
-        verify(&answer.body, &reference.tag)?;
-    }
-    let mut digest = if pinned {
-        reference.tag.clone()
-    } else {
-        digest_of(&answer.body)
-    };
-    let mut manifest: Manifest = parse(&answer.body)?;
+    let (mut digest, mut manifest, index) = session.manifest().await?;
     let mut platform = None;
-    if is_index(answer.content_type.as_deref(), &manifest) {
+    if index {
         let chosen = choose(&manifest.manifests, architectures)?;
         platform = Some(chosen.platform_name());
         digest.clone_from(&chosen.digest);
-        let accept = MANIFEST_TYPES.join(", ");
-        let answer = session
-            .fetch(&manifest_path(reference, &digest), &accept, MANIFEST_LIMIT)
-            .await?;
-        verify(&answer.body, &digest)?;
-        manifest = parse(&answer.body)?;
+        manifest = session.platform_manifest(&digest).await?;
     }
-    let config = manifest
-        .config
-        .ok_or_else(|| Unreadable::Unexpected("the manifest names no configuration".to_owned()))?;
-    if !config.digest.starts_with("sha256:") {
-        return Err(Unreadable::Unexpected(format!(
-            "the configuration's digest {} is not SHA-256",
-            config.digest
-        )));
-    }
-    let path = format!("/v2/{}/blobs/{}", reference.repository, config.digest);
-    let answer = session.fetch(&path, "*/*", CONFIG_LIMIT).await?;
-    verify(&answer.body, &config.digest)?;
-    let image: ImageConfig = parse(&answer.body)?;
+    let image = session.configuration(&manifest).await?;
     let platform = platform.unwrap_or_else(|| {
         Platform {
             os: image.os.clone().unwrap_or_default(),
@@ -238,7 +207,185 @@ pub(crate) async fn inspect(
     })
 }
 
+/// The exact manifest to pin and the running image IDs a container runtime may report for it.
+#[derive(Debug, PartialEq, Eq)]
+pub struct PublishedImage {
+    /// SHA-256 of the manifest or multi-platform index served under the requested tag.
+    pub digest: String,
+    /// Linux architectures this image offers.
+    pub architectures: BTreeSet<String>,
+    /// Manifest, platform-manifest and (for a single image) configuration digests.
+    pub image_ids: BTreeSet<String>,
+}
+
+/// Read the current tag directly for a scheduled update.
+///
+/// Uses the same bounded OCI requests,
+/// authentication and digest verification as image inspection. Pull Secrets belong to this
+/// database's namespace and only the entry for this registry may supply credentials.
+///
+/// # Errors
+///
+/// The image, referenced pull Secret or registry could not be read.
+pub async fn published(
+    transport: &dyn Transport,
+    cluster: &dyn zeabur_kube::Cluster,
+    namespace: &str,
+    pull_secrets: &[String],
+    image: &str,
+    http_registries: &[String],
+    runtime_architectures: &[String],
+) -> Result<PublishedImage, String> {
+    let reference = Reference::parse(image).ok_or("invalid image reference")?;
+    let mut credential = None;
+    for name in pull_secrets {
+        let values = cluster
+            .pull_secret(namespace, name)
+            .await
+            .map_err(|error| {
+                format!(
+                    "cannot read pull Secret {name}: {:?}",
+                    error.into_problem("pull Secret").kind
+                )
+            })?;
+        credential = super::from_pull_secret(&values, &reference.registry);
+        if credential.is_some() {
+            break;
+        }
+    }
+    let host = reference.api_host();
+    let scheme = if http_registries
+        .iter()
+        .any(|allowed| allowed.eq_ignore_ascii_case(host))
+    {
+        "http"
+    } else {
+        "https"
+    };
+    Session {
+        transport,
+        reference: &reference,
+        base: format!("{scheme}://{host}"),
+        restrict_http: true,
+        credential: credential.as_ref(),
+        authorization: None,
+    }
+    .published(runtime_architectures)
+    .await
+    .map_err(|why| {
+        match why {
+            Unreadable::NotFound => "registry image not found",
+            Unreadable::Unauthorized => "registry authentication refused",
+            Unreadable::NoPlatform(_) => "registry image lacks a required platform",
+            Unreadable::Unreachable(_) => "registry could not be reached",
+            Unreadable::Unexpected(_) => "invalid registry response",
+        }
+        .to_owned()
+    })
+}
+
 impl Session<'_> {
+    async fn published(
+        &mut self,
+        runtime_architectures: &[String],
+    ) -> Result<PublishedImage, Unreadable> {
+        let (digest, manifest, index) = self.manifest().await?;
+        let mut image_ids = BTreeSet::from([digest.clone()]);
+        let mut architectures = BTreeSet::new();
+        if index {
+            // Some runtimes report the configuration digest. For an unpinned database,
+            // resolve the same immutable platform manifest the runtime selected.
+            for arch in runtime_architectures {
+                let member = choose(&manifest.manifests, std::slice::from_ref(arch))?;
+                let child = self.platform_manifest(&member.digest).await?;
+                if let Some(config) = child.config.filter(|c| valid_digest(&c.digest)) {
+                    image_ids.insert(config.digest);
+                }
+            }
+            for entry in manifest.manifests {
+                if let Some(p) = entry.platform
+                    && p.os == "linux"
+                    && !p.architecture.is_empty()
+                    && valid_digest(&entry.digest)
+                {
+                    architectures.insert(p.architecture);
+                    image_ids.insert(entry.digest);
+                }
+            }
+        } else {
+            let config = self.configuration(&manifest).await?;
+            if config.os.as_deref() == Some("linux")
+                && let Some(arch) = config.architecture.filter(|a| !a.is_empty())
+            {
+                architectures.insert(arch);
+            }
+            if let Some(config) = manifest.config {
+                image_ids.insert(config.digest);
+            }
+        }
+        Ok(PublishedImage {
+            digest,
+            architectures,
+            image_ids,
+        })
+    }
+
+    async fn manifest(&mut self) -> Result<(String, Manifest, bool), Unreadable> {
+        let accept = [INDEX_TYPES, MANIFEST_TYPES].concat().join(", ");
+        let pinned = self.reference.tag.starts_with("sha256:");
+        let answer = self
+            .fetch(
+                &manifest_path(self.reference, &self.reference.tag),
+                &accept,
+                MANIFEST_LIMIT,
+            )
+            .await?;
+        if pinned {
+            verify(&answer.body, &self.reference.tag)?;
+        }
+        let digest = if pinned {
+            self.reference.tag.clone()
+        } else {
+            digest_of(&answer.body)
+        };
+        let manifest: Manifest = parse(&answer.body)?;
+        let index = is_index(answer.content_type.as_deref(), &manifest);
+        Ok((digest, manifest, index))
+    }
+
+    async fn platform_manifest(&mut self, digest: &str) -> Result<Manifest, Unreadable> {
+        if !valid_digest(digest) {
+            return Err(Unreadable::Unexpected(
+                "invalid platform manifest digest".to_owned(),
+            ));
+        }
+        let answer = self
+            .fetch(
+                &manifest_path(self.reference, digest),
+                &MANIFEST_TYPES.join(", "),
+                MANIFEST_LIMIT,
+            )
+            .await?;
+        verify(&answer.body, digest)?;
+        parse(&answer.body)
+    }
+
+    async fn configuration(&mut self, manifest: &Manifest) -> Result<ImageConfig, Unreadable> {
+        let config = manifest.config.as_ref().ok_or_else(|| {
+            Unreadable::Unexpected("the manifest names no configuration".to_owned())
+        })?;
+        if !valid_digest(&config.digest) {
+            return Err(Unreadable::Unexpected(format!(
+                "the configuration's digest {} is not SHA-256",
+                config.digest
+            )));
+        }
+        let path = format!("/v2/{}/blobs/{}", self.reference.repository, config.digest);
+        let answer = self.fetch(&path, "*/*", CONFIG_LIMIT).await?;
+        verify(&answer.body, &config.digest)?;
+        parse(&answer.body)
+    }
+
     async fn fetch(
         &mut self,
         path: &str,
@@ -275,6 +422,12 @@ impl Session<'_> {
                         Unreadable::Unexpected("a redirect without a location".to_owned())
                     })?;
                     url = join(&url, &location)?;
+                    if self.restrict_http && url.starts_with("http://") && origin(&url) != self.base
+                    {
+                        return Err(Unreadable::Unexpected(
+                            "an insecure registry redirect".to_owned(),
+                        ));
+                    }
                     // The registry's credentials and token go only to the URL Zeabur asked for:
                     // no hop of a redirect carries them, and a challenge after one is not answered.
                     authorization = None;
@@ -829,6 +982,45 @@ mod tests {
             &architectures,
         )
         .await
+    }
+
+    #[tokio::test]
+    async fn scheduled_checks_keep_index_and_runtime_configuration_digests_distinct() {
+        let registry = nginx();
+        let reference = reference("registry.test/library/nginx");
+        let candidate = Session {
+            transport: &registry,
+            reference: &reference,
+            base: REGISTRY.to_owned(),
+            restrict_http: true,
+            credential: None,
+            authorization: None,
+        }
+        .published(&["amd64".to_owned(), "arm64".to_owned()])
+        .await
+        .unwrap();
+        let tag = &registry.routes[&format!("{REGISTRY}/v2/library/nginx/manifests/latest")];
+        assert_eq!(candidate.digest, digest_of(&tag.body));
+        assert_eq!(
+            candidate.architectures,
+            BTreeSet::from(["amd64".to_owned(), "arm64".to_owned()])
+        );
+        // Both the per-platform manifest and its config are valid IDs for an unpinned pod.
+        let index: Manifest = parse(&tag.body).unwrap();
+        for member in index.manifests {
+            if member.platform.is_none_or(|p| p.os != "linux") {
+                assert!(!candidate.image_ids.contains(&member.digest));
+                continue;
+            }
+            assert!(candidate.image_ids.contains(&member.digest));
+            let url = format!("{REGISTRY}/v2/library/nginx/manifests/{}", member.digest);
+            let manifest: Manifest = parse(&registry.routes[&url].body).unwrap();
+            assert!(
+                candidate
+                    .image_ids
+                    .contains(&manifest.config.unwrap().digest)
+            );
+        }
     }
 
     #[tokio::test]

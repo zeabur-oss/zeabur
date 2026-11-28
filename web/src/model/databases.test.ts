@@ -4,6 +4,7 @@ import type { Schemas } from "@/api/client"
 import { actionOf, describe as describePlan } from "@/components/plan/describe"
 import { databaseLink } from "@/lib/place"
 import { databaseNodes } from "@/model/database-parts"
+import { mergeChanges } from "@/model/draft"
 import type { Translate } from "@/i18n"
 
 import {
@@ -24,6 +25,7 @@ import {
   connectionUri,
   createDatabase,
   databaseAddress,
+  updateDatabaseImages,
   DATABASE_LABEL,
   deleteDatabase,
   madeObjects,
@@ -50,6 +52,72 @@ import {
   targetProblems,
   type Database,
 } from "@/model/databases"
+
+describe("CloudNativePG automatic updates", () => {
+  const image = "ghcr.io/cloudnative-pg/postgresql:18-standard-trixie@sha256:pin"
+  const object = {
+    apiVersion: "postgresql.cnpg.io/v1",
+    kind: "Cluster",
+    metadata: {
+      name: "pg",
+      namespace: "shop",
+      resourceVersion: "42",
+      annotations: { "kubectl.kubernetes.io/last-applied-configuration": "{}" },
+    },
+    spec: {
+      imageName: image,
+      instances: 2,
+      storage: { size: "8Gi" },
+      plugins: [{ name: "backup" }],
+    },
+  }
+  const database = () => ({
+    ...postgres,
+    object: structuredClone(object) as unknown as Database["object"],
+  })
+
+  test("settings requests never replay the Cluster snapshot, including its last-applied annotation", () => {
+    const db = database()
+    const update = {
+      kind: "image",
+      policy: "sameTag",
+      window: { day: "sunday", hour: 3 },
+    } as const
+    const workload = { kind: "Cluster", name: db.name } as const
+    expect(updateDatabaseImages(db, update)).toEqual([{ op: "autoUpdate", workload, update }])
+    expect(updateDatabaseImages(db, { kind: "off" })).toEqual([
+      { op: "autoUpdate", workload, update: { kind: "off" } },
+    ])
+    expect(db.object).toEqual(object)
+  })
+
+  test("a later database update replaces only that Cluster's draft settings", () => {
+    const db = database()
+    const service: Schemas.Change = {
+      op: "autoUpdate",
+      workload: { kind: "Deployment", name: db.name },
+      update: { kind: "off" },
+    }
+    const enable = updateDatabaseImages(db, { kind: "image", policy: "sameTag" })
+    const disable = updateDatabaseImages(db, { kind: "off" })
+    expect(mergeChanges([...enable, service], disable)).toEqual([...disable, service])
+  })
+
+  test("the semantic review names the database and its requested schedule or Off", () => {
+    const t = ((key: string, ...args: unknown[]) =>
+      args.length > 0 ? `${key}(${args.join(", ")})` : key) as unknown as Translate
+    const review = (update: Schemas.Update) => {
+      const ask = { changes: updateDatabaseImages(database(), update) }
+      return describePlan(t, ask, { objects: [], impact: [], warnings: [] }, () => undefined)
+    }
+    expect(review({ kind: "image", policy: "sameTag", window: { hour: 3 } }).lines).toEqual([
+      "confirm.imageUpdates(pg, sameTag, imageUpdates.window.daily(03:00))",
+    ])
+    const off = review({ kind: "off" })
+    expect(off.lines).toEqual(["confirm.autoUpdateOff(pg)"])
+    expect(off.action).toBe("action.autoUpdateOff")
+  })
+})
 
 /** `live` with `patch` merged in as a JSON merge patch, as the server merges a spec-only edit. */
 function merged(live: unknown, patch: unknown): Record<string, unknown> {

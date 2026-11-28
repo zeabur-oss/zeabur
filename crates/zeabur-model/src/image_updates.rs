@@ -243,7 +243,7 @@ impl ImageUpdates {
     }
 }
 
-fn setting(
+pub(crate) fn setting(
     policy: &str,
     trigger: Option<&str>,
     schedule: Option<&str>,

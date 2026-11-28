@@ -333,6 +333,7 @@ pub fn database(
         object: databases::written(cluster),
         pods: Vec::new(),
         restored: databases::restored(cluster),
+        image_updates: None,
         unmanaged: false,
         name,
     }

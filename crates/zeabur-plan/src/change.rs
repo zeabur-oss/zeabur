@@ -47,6 +47,30 @@ pub enum Update {
     },
 }
 
+/// The existing service targets, or a CloudNativePG Cluster, whose Keel settings change.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(untagged)]
+pub enum AutoUpdateTarget {
+    /// A service's workload.
+    Workload(WorkloadRef),
+    /// A `postgresql.cnpg.io/v1` Cluster.
+    Cluster {
+        /// The CloudNativePG kind.
+        kind: AutoUpdateClusterKind,
+        /// The Cluster's name.
+        name: String,
+    },
+}
+
+/// The database kind accepted by [`AutoUpdateTarget`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+pub enum AutoUpdateClusterKind {
+    /// `postgresql.cnpg.io/v1` Cluster.
+    Cluster,
+}
+
 // `zeabur-api` resolves `PageServer`, `Template` and `CopyS3Keys` into other changes, and makes
 // the deploy key of a `CreateBuiltService` or `SetBuild` from Git, before the planner sees them.
 // The planner rejects them.
@@ -287,11 +311,11 @@ pub enum Change {
     /// Set what a Zeabur Builder `Build` builds: its directory, its Dockerfile and its build
     /// variables (see the `builds` module).
     BuildOptions(BuildOptionsChange),
-    /// Have Keel move a workload to new images, or stop it (see the `builds` module).
+    /// Have Keel move a workload or CloudNativePG Cluster to new images, or stop it.
     #[serde(rename_all = "camelCase")]
     AutoUpdate {
-        /// The workload: a Deployment, StatefulSet or DaemonSet.
-        workload: WorkloadRef,
+        /// A service's workload, or a CloudNativePG Cluster.
+        workload: AutoUpdateTarget,
         /// Which updates, if any.
         update: Update,
     },

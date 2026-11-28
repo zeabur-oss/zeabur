@@ -1777,3 +1777,8 @@ export function deleteDatabase(database: Database, gone: Made[] = []): Change[] 
     ...gone.map((m): Change => ({ op: "delete", resource: m.resource, name: m.name })),
   ]
 }
+
+/** The server reads the current Cluster before planning its update settings. */
+export function updateDatabaseImages(database: Database, update: Schemas.Update): Change[] {
+  return [{ op: "autoUpdate", workload: { kind: "Cluster", name: database.name }, update }]
+}

@@ -25,13 +25,14 @@
 //! [builder]: https://github.com/zeabur-oss/builder
 //! [keel]: https://keel.sh/docs/#policies
 
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Value, json};
 use zeabur_model::{
     ImagePolicy, KEEL_ANNOTATIONS, KEEL_POLL, UpdateWindow, WorkloadKind, WorkloadRef,
 };
 pub use zeabur_model::{KEEL_FORCE, KEEL_POLICY};
 
-use crate::change::{BuildOptionsChange, Target, Update};
+use crate::change::{AutoUpdateTarget, BuildOptionsChange, Target, Update};
 use crate::checks::ResourceRef;
 use crate::fields::Step;
 use crate::json::{add, pointer, remove, replace, test};
@@ -82,16 +83,33 @@ fn keel_annotations(update: &Update) -> [Option<String>; 4] {
     }
 }
 
-fn unchanged_update(reference: &WorkloadRef) -> PlanError {
+fn unchanged_update(kind: &str, name: &str) -> PlanError {
     error(
         ErrorKind::BadRequest,
         "unchanged",
-        format!(
-            "{} {} is already updated this way.",
-            reference.kind.as_str(),
-            reference.name
-        ),
+        format!("{kind} {name} is already updated this way."),
     )
+}
+
+fn validate_window(window: Option<UpdateWindow>) -> Result<(), PlanError> {
+    if window.is_some_and(|w| w.hour > 23) {
+        return Err(error(
+            ErrorKind::BadRequest,
+            "invalid_window",
+            "The hour of the update window must be 0 to 23.",
+        ));
+    }
+    Ok(())
+}
+
+/// The CloudNativePG resource whose image updates the database updater handles.
+#[must_use]
+pub fn cloudnative_pg_clusters() -> ResourceRef {
+    ResourceRef {
+        group: "postgresql.cnpg.io".to_owned(),
+        version: "v1".to_owned(),
+        resource: "clusters".to_owned(),
+    }
 }
 
 /// Most build variables a `Build` takes.
@@ -317,17 +335,114 @@ impl Planner<'_> {
 
     pub(crate) fn auto_update(
         &mut self,
-        reference: &WorkloadRef,
+        target: &AutoUpdateTarget,
         update: &Update,
     ) -> Result<(), PlanError> {
+        let reference = match target {
+            AutoUpdateTarget::Workload(reference) => reference,
+            AutoUpdateTarget::Cluster { name, .. } => {
+                return self.cluster_auto_update(name, update);
+            }
+        };
         let changed = self.write_keel(reference, update)?;
         if let Update::NewBuilds { build, webhook } = update {
             return self.notify_keel(build, webhook, changed, reference);
         }
         if !changed {
-            return Err(unchanged_update(reference));
+            return Err(unchanged_update(reference.kind.as_str(), &reference.name));
         }
         Ok(())
+    }
+
+    fn cluster_auto_update(&mut self, name: &str, update: &Update) -> Result<(), PlanError> {
+        let resource = cloudnative_pg_clusters();
+        let object = self
+            .input
+            .objects
+            .iter()
+            .find(|f| f.resource == resource && f.name == name)
+            .map(|f| f.object.clone())
+            .ok_or_else(|| {
+                error(
+                    ErrorKind::NotFound,
+                    "unknown_object",
+                    format!("There is no Cluster named {name}."),
+                )
+            })?;
+        let metadata: ObjectMeta = serde_json::from_value(
+            object.get("metadata").cloned().unwrap_or_default(),
+        )
+        .map_err(|e| {
+            error(
+                ErrorKind::Invalid,
+                "invalid_object",
+                format!("Cannot read Cluster {name}: {e}"),
+            )
+        })?;
+        Self::refuse_managed(&metadata, "Cluster", name)?;
+        let choices = zeabur_model::database_image_updates(
+            &metadata,
+            object.get("spec").unwrap_or(&Value::Null),
+        )
+        .ok_or_else(|| {
+            error(
+                ErrorKind::Conflict,
+                "database_updates_read_only",
+                "The Cluster is being deleted or its update settings are managed by another tool.",
+            )
+        })?;
+        if let Update::Image { policy, window } = update {
+            validate_window(*window)?;
+            if !choices.allowed.contains(policy) {
+                return Err(error(
+                    ErrorKind::BadRequest,
+                    "policy_not_allowed",
+                    "CloudNativePG updates require an explicit PostgreSQL major tag, no image catalog, controlling owner or approval requirement, and the same-tag policy.",
+                ));
+            }
+        } else if !matches!(update, Update::Off) {
+            return Err(error(
+                ErrorKind::BadRequest,
+                "policy_not_allowed",
+                "CloudNativePG updates use the same-tag image policy.",
+            ));
+        }
+        let index = self.working(
+            Target {
+                api_version: "postgresql.cnpg.io/v1".to_owned(),
+                kind: "Cluster".to_owned(),
+                plural: "clusters".to_owned(),
+                name: name.to_owned(),
+            },
+            object,
+        );
+        let normalized = self.clear_cluster_keel_overrides(index)?;
+        if !self.write_keel_annotations(index, update)? && !normalized {
+            return Err(unchanged_update("Cluster", name));
+        }
+        Ok(())
+    }
+
+    fn clear_cluster_keel_overrides(&mut self, index: usize) -> Result<bool, PlanError> {
+        let mut changed = false;
+        for map in ["labels", "annotations"] {
+            for key in KEEL_ANNOTATIONS
+                .into_iter()
+                .chain(std::iter::once("keel.sh/matchTag"))
+            {
+                if map == "annotations" && key != "keel.sh/matchTag" {
+                    continue;
+                }
+                let path = pointer(&["metadata", map, key]);
+                let Some(before) = self.current(index).pointer(&path).cloned() else {
+                    continue;
+                };
+                self.claim(index, &steps(map, key), &shown(map, key))?;
+                self.patch(index, vec![test(&path, before), remove(&path)])?;
+                changed = true;
+            }
+        }
+        Ok(changed)
     }
 
     /// Writes the Keel annotations `update` asks for on the workload; returns whether any
@@ -351,13 +466,7 @@ impl Planner<'_> {
         }
         Self::refuse_managed(found.meta(), reference.kind.as_str(), &reference.name)?;
         if let Update::Image { policy, window } = update {
-            if window.is_some_and(|w| w.hour > 23) {
-                return Err(error(
-                    ErrorKind::BadRequest,
-                    "invalid_window",
-                    "The hour of the update window must be 0 to 23.",
-                ));
-            }
+            validate_window(*window)?;
             let images = found
                 .pod_spec()
                 .into_iter()
@@ -376,6 +485,10 @@ impl Planner<'_> {
             }
         }
         let index = self.working(workload_target(found), workload_json(found)?);
+        self.write_keel_annotations(index, update)
+    }
+
+    fn write_keel_annotations(&mut self, index: usize, update: &Update) -> Result<bool, PlanError> {
         let wanted = keel_annotations(update);
         let mut changed = false;
         for (key, value) in KEEL_ANNOTATIONS.into_iter().zip(wanted) {
@@ -440,7 +553,7 @@ impl Planner<'_> {
             return if changed {
                 Ok(())
             } else {
-                Err(unchanged_update(reference))
+                Err(unchanged_update(reference.kind.as_str(), &reference.name))
             };
         }
         self.claim(

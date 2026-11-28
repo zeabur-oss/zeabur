@@ -5,6 +5,10 @@ How the code is split, built and packaged. What Zeabur OSS does for the people w
 
 ## Crates
 
+The optional `zeabur database-updater` command runs with its own ServiceAccount. Its registry
+and Kubernetes clients are the ones used by the server. See
+[CloudNativePG image updates](cloudnative-pg-image-updates.md).
+
 The code is split into small crates in one flat `crates/` directory:
 
 - **Dependencies only point downwards**, with no cycles ([Kladov][matklad-workspaces]; Lakos and

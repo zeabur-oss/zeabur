@@ -205,6 +205,14 @@ pub trait Cluster: Send + Sync {
         name: &'a str,
     ) -> Answer<'a, BTreeMap<String, Vec<u8>>>;
 
+    /// The Docker configuration from a namespace-local image pull Secret. Other Secret types
+    /// return an empty map. The type and data come from the same read.
+    fn pull_secret<'a>(
+        &'a self,
+        namespace: &'a str,
+        name: &'a str,
+    ) -> Answer<'a, BTreeMap<String, Vec<u8>>>;
+
     /// Cluster-wide facts used to detect installed capabilities. Probes this person may not run
     /// are left empty and listed in [`ClusterFacts::unreadable`].
     fn cluster_facts(&self) -> Answer<'_, ClusterFacts>;

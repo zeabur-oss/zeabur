@@ -775,6 +775,19 @@ export const en = {
     "Auto-deploy needs the Keel component, which this cluster doesn't have and can't install on its Kubernetes version.",
   "builds.keelMissing": "Auto-deploy needs the Keel component, which this cluster doesn't have.",
   "builds.history": "History",
+  "db.imageUpdates.hint":
+    "Refresh this PostgreSQL tag on its schedule. CloudNativePG rolls out the new digest; the tag and PostgreSQL major version stay the same.",
+  "db.imageUpdates.updater.checking": "Checking automatic database updates…",
+  "db.imageUpdates.updater.ready": "Automatic database updates are ready.",
+  "db.imageUpdates.updater.missing":
+    "Automatic database updates aren't installed. Ask a cluster administrator to enable the database updater.",
+  "db.imageUpdates.updater.notReady":
+    "The database updater isn't ready. Ask a cluster administrator to check it.",
+  "db.imageUpdates.updater.unknown": "The database updater couldn't be checked. Try again.",
+  "db.imageUpdates.updater.forbidden":
+    "Your account can't check the database updater. Ask a cluster administrator for access.",
+  "db.imageUpdates.unavailable":
+    "Use a PostgreSQL major-version tag, such as 18-standard-trixie, without an image catalog or approval requirement. A tag with a digest can be refreshed.",
   "imageUpdates.hint":
     "Move this service to new versions of its image on its own. Each update restarts the service.",
   "imageUpdates.versions": "Which versions",
@@ -811,8 +824,8 @@ export const en = {
   "imageUpdates.when.weekly": "Once a week",
   "imageUpdates.day": "Day",
   "imageUpdates.hour": "Time",
-  "imageUpdates.hourlyHint": "Keel checks every hour.",
-  "imageUpdates.utc": (when: string) => `Pick it in your time zone. Keel checks ${when}.`,
+  "imageUpdates.hourlyHint": "Checks for a new image every hour.",
+  "imageUpdates.utc": (when: string) => `Pick it in your time zone. Checks run ${when}.`,
   "imageUpdates.window.weekly": (day: number, time: string) => `${weekdayEn[day]}s at ${time} UTC`,
   "imageUpdates.window.daily": (time: string) => `every day at ${time} UTC`,
   "imageUpdates.keelMissing":

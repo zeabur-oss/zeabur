@@ -729,6 +729,17 @@ export const zhTW: Messages = {
     "自動部署需要 Keel 元件，但這個叢集沒有，它的 Kubernetes 版本也裝不了。",
   "builds.keelMissing": "自動部署需要叢集裡的 Keel 元件，目前還沒有安裝。",
   "builds.history": "紀錄",
+  "db.imageUpdates.hint":
+    "依排程更新此 PostgreSQL 標籤的映像檔摘要，由 CloudNativePG 逐一更新執行個體；標籤與 PostgreSQL 主版本維持不變。",
+  "db.imageUpdates.updater.checking": "正在檢查資料庫自動更新…",
+  "db.imageUpdates.updater.ready": "資料庫自動更新已就緒。",
+  "db.imageUpdates.updater.missing": "尚未安裝資料庫自動更新。請叢集管理員啟用資料庫更新程式。",
+  "db.imageUpdates.updater.notReady": "資料庫更新程式尚未就緒。請叢集管理員檢查。",
+  "db.imageUpdates.updater.unknown": "無法確認資料庫更新程式的狀態，請重試。",
+  "db.imageUpdates.updater.forbidden":
+    "你的帳號無法檢視資料庫更新程式。請向叢集管理員申請存取權限。",
+  "db.imageUpdates.unavailable":
+    "請使用 PostgreSQL 主版本標籤（例如 18-standard-trixie），且不要使用映像目錄或設定核准條件。標籤即使附有摘要，也能更新。",
   "imageUpdates.hint": "讓服務自動換上映像檔的新版本。每次更新都會重新啟動服務。",
   "imageUpdates.versions": "更新哪些版本",
   "imageUpdates.policy.other": (policy) => `Zeabur 以外的設定：${policy}`,
@@ -759,8 +770,8 @@ export const zhTW: Messages = {
   "imageUpdates.when.weekly": "每週一次",
   "imageUpdates.day": "星期",
   "imageUpdates.hour": "時間",
-  "imageUpdates.hourlyHint": "Keel 每小時檢查一次。",
-  "imageUpdates.utc": (when) => `依你的時區選擇。Keel 會在${when}檢查。`,
+  "imageUpdates.hourlyHint": "每小時檢查一次新映像檔。",
+  "imageUpdates.utc": (when) => `依你的時區選擇，會在${when}檢查。`,
   "imageUpdates.window.weekly": (day, time) => `每${weekdayZhTW[day]} ${time}（UTC）`,
   "imageUpdates.window.daily": (time) => `每天 ${time}（UTC）`,
   "imageUpdates.keelMissing": "自動更新需要叢集裡的 Keel 元件，目前還沒有安裝。",

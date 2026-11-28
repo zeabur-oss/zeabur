@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 pub mod error_pages;
 pub mod gateway;
 pub mod group;
+pub mod image_reference;
 pub mod images;
 pub mod operators;
 pub mod provenance;

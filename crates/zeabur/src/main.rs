@@ -10,6 +10,7 @@
 
 mod components;
 mod config;
+mod database_updater;
 mod output;
 mod pages;
 mod proxy;
@@ -57,6 +58,7 @@ fn log_filter() -> Targets {
 /// What the command line asks for: `zeabur components …`, else the server.
 enum Command {
     Components(ComponentsArgs),
+    DatabaseUpdater(database_updater::Args),
     Serve(Box<Args>),
 }
 
@@ -69,6 +71,10 @@ impl Command {
             let program = OsString::from("zeabur components");
             Self::Components(ComponentsArgs::parse_from(
                 std::iter::once(program).chain(rest),
+            ))
+        } else if rest.next_if(|first| first == "database-updater").is_some() {
+            Self::DatabaseUpdater(database_updater::Args::parse_from(
+                std::iter::once(OsString::from("zeabur database-updater")).chain(rest),
             ))
         } else {
             Self::Serve(Box::new(Args::parse_from(
@@ -91,6 +97,7 @@ async fn main() -> ExitCode {
     }
     let result = match &command {
         Command::Components(components) => components::run(components).await,
+        Command::DatabaseUpdater(args) => database_updater::run(args).await,
         Command::Serve(args) => match args.check() {
             Ok(config) => serve(args, config).await,
             Err(message) => Err(message),

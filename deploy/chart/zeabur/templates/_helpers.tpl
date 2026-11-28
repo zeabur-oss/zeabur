@@ -146,6 +146,11 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- .Values.proxy.tls.existingSecret | default (printf "%s-tls" (include "zeabur.proxyName" .)) -}}
 {{- end -}}
 
+{{/* Keep the suffix even when the release has a long name. */}}
+{{- define "zeabur.databaseUpdaterName" -}}
+{{- printf "%s-database-updater" (include "zeabur.fullname" . | trunc 46 | trimSuffix "-") -}}
+{{- end -}}
+
 {{/* How Zeabur reaches out (extraTrustedCA, outboundProxy), the same in the server and the
      components Job: env entries, the extra-ca volume and its mount. */}}
 {{- define "zeabur.outboundEnv" -}}
