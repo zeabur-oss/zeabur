@@ -102,7 +102,7 @@ Select a registered S3 destination, or enter the **Endpoint**, **Bucket**, **Acc
 
 If you leave **Folder** blank, it defaults to `<project>/<PVC name>`. For example, the disk `data-redis-0` in project `shop` uses `shop/data-redis-0`.
 
-For **Schedule**, choose **Daily at 03:00 UTC** or **Sundays at 03:00 UTC**. The default retention rules are **Keep the newest**: 3, **Keep daily, in days**: 7, and **Keep weekly, in weeks**: 4. K8up removes old backups according to these rules one hour after the backup, at 04:00 UTC.
+For **Schedule**, choose **Every day** or **Every week**, then the **Day** for weekly backups and the **Time**, in your browser's time zone. The line below shows the same time in UTC. New backups default to 03:00 UTC every day. The default retention rules are **Keep the newest**: 3, **Keep daily, in days**: 7, and **Keep weekly, in weeks**: 4. K8up removes old backups according to these rules one hour after the backup.
 
 </Step>
 <Step>

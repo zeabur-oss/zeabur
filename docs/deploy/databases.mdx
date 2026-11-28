@@ -86,7 +86,7 @@ PostgreSQL, MongoDB, MySQL and MariaDB can back up to S3. Dragonfly has no **Bac
 1. Open the database's **Backups** → **Set up backups**.
 2. **S3 destination** defaults to the first destination registered in the cluster. To use a different location, choose another destination, or select **Enter manually** and fill in the **Endpoint**, **Bucket**, **Region**, **Access key ID**, and **Secret access key**. If the cluster has no destinations yet, the form links to where you can add one.
 3. If a **Folder** field is available, use it to specify the storage location. Leave it empty to use the database name. MySQL always writes to `moco/<project-name>/<database-name>`.
-4. Under **Schedule**, select **Daily at 03:00 UTC** or **Sundays at 03:00 UTC**. That's 11:00 AM Taiwan time.
+4. Under **Schedule**, select **Every day** or **Every week**, then the **Day** for weekly backups and the **Time**. You pick them in your browser's time zone, and the line below shows the same time in UTC. New backups default to 03:00 UTC every day. Zeabur OSS stores the time in UTC, so it does not follow daylight saving time.
 5. Set retention for the engine, then select **Review changes**. The review lists the schedule and destination, retention days, the secret that stores the keys, and whether the database will restart, each in a sentence. Check the details, then select **Set up backups**.
 
 <Callout type="warn">

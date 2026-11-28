@@ -12,7 +12,7 @@ import { FormField, NumberInput } from "@/components/form-field"
 import { GateTip, useGate } from "@/components/gate"
 import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { usePlanner, usePlanStep } from "@/components/plan/planner"
-import { FrequencyField, S3Fields } from "@/components/s3-fields"
+import { BackupTimeField, S3Fields } from "@/components/s3-fields"
 import { Schedule } from "@/components/schedule"
 import { VolumeRestore } from "@/components/volume-restore"
 import { type Translate, useT } from "@/i18n"
@@ -377,7 +377,7 @@ function ScheduleDrawer({
           folder={`${project}/${claim}`}
           folderHint={t("backups.volume.folderHint", `${project}/${claim}`)}
         >
-          <FrequencyField value={target.frequency} onChange={(frequency) => set({ frequency })} />
+          <BackupTimeField value={target.time} onChange={(time) => set({ time })} />
           {count("keepLast", t("backups.volume.keepLast"))}
           {count("keepDays", t("backups.volume.keepDaily"))}
           {count("keepWeekly", t("backups.volume.keepWeekly"))}

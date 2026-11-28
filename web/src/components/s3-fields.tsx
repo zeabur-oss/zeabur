@@ -4,8 +4,17 @@ import { useEffect, useRef, type ReactNode } from "react"
 
 import { s3DestinationsQuery } from "@/api/queries"
 import { FormField } from "@/components/form-field"
-import { useT } from "@/i18n"
-import type { Frequency, TargetProblem } from "@/model/databases"
+import { useI18n, useT } from "@/i18n"
+import {
+  type BackupTime,
+  browserOffset,
+  clock,
+  clockMinute,
+  shiftTime,
+  utcWords,
+} from "@/lib/backup-time"
+import type { TargetProblem } from "@/model/databases"
+import { dayName } from "@/model/image-updates"
 import { type Destination, fromDestination, manual, type S3Target } from "@/model/s3-destinations"
 import { Input } from "@zeabur-oss/design-system/components/input"
 import { Select } from "@zeabur-oss/design-system/components/select"
@@ -199,26 +208,60 @@ function KeyFields({
   )
 }
 
-/** How often backups run. */
-export function FrequencyField({
+/** When backups run, in the browser's time; the form keeps it in UTC. */
+export function BackupTimeField({
   value,
   onChange,
 }: {
-  value: Frequency
-  onChange: (frequency: Frequency) => void
+  value: BackupTime
+  onChange: (time: BackupTime) => void
 }) {
-  const t = useT()
+  const { t, locale } = useI18n()
+  const offset = browserOffset()
+  const local = shiftTime(value, offset)
+  const set = (change: Partial<BackupTime>) => onChange(shiftTime({ ...local, ...change }, -offset))
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
   return (
-    <FormField label={t("db.backup.frequency")}>
-      <Select
-        size="sm"
-        value={value}
-        onValueChange={(frequency) => onChange(frequency as Frequency)}
-        items={[
-          { value: "daily", label: t("db.backup.daily") },
-          { value: "weekly", label: t("db.backup.weekly") },
-        ]}
-      />
-    </FormField>
+    <>
+      <FormField label={t("db.backup.frequency")}>
+        <Select
+          size="sm"
+          value={value.weekly ? "weekly" : "daily"}
+          onValueChange={(often) => set({ weekly: often === "weekly" })}
+          items={[
+            { value: "daily", label: t("backupTime.everyDay") },
+            { value: "weekly", label: t("backupTime.everyWeek") },
+          ]}
+        />
+      </FormField>
+      {value.weekly ? (
+        <FormField label={t("imageUpdates.day")}>
+          <Select
+            size="sm"
+            value={String(local.day)}
+            onValueChange={(day) => set({ day: Number(day) })}
+            items={[0, 1, 2, 3, 4, 5, 6].map((d) => ({
+              value: String(d),
+              label: dayName(d, locale),
+            }))}
+          />
+        </FormField>
+      ) : null}
+      <FormField
+        label={t("clusterBackups.time")}
+        hint={t("backupTime.hint", zone, utcWords(t, value))}
+      >
+        <Input
+          size="sm"
+          type="time"
+          required
+          value={clock(local.minute)}
+          onChange={(event) => {
+            const minute = clockMinute(event.target.value)
+            if (minute !== undefined) set({ minute })
+          }}
+        />
+      </FormField>
+    </>
   )
 }

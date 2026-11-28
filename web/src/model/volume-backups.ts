@@ -3,6 +3,7 @@
 // prunes by its retention.
 // https://docs.k8up.io/k8up/2.16/references/api-reference.html
 import type { Schemas } from "@/api/client"
+import { backupCron, DEFAULT_TIME, shiftTime } from "@/lib/backup-time"
 import {
   backupName,
   newPassword,
@@ -87,7 +88,7 @@ export const newVolumeTarget = (): VolumeTarget => ({
   region: "",
   accessKey: "",
   secretKey: "",
-  frequency: "daily",
+  time: DEFAULT_TIME,
   keepDays: 7,
   keepLast: 3,
   keepWeekly: 4,
@@ -126,7 +127,6 @@ export function scheduleVolumeBackups(
 ): Change[] {
   const { secret, schedule } = names(claim)
   const region = target.region.trim()
-  const cron = target.frequency === "weekly" ? "0 3 * * 0" : "0 3 * * *"
   return [
     keysSecret(secret, target, AWS_KEYS, {
       RESTIC_PASSWORD: password(),
@@ -159,11 +159,11 @@ export function scheduleVolumeBackups(
           ? { podSecurityContext: { runAsUser: 0 } }
           : { podConfigRef: { name: schedule } }),
         backup: {
-          schedule: cron,
+          schedule: backupCron(target.time),
           labelSelectors: [{ matchLabels: { [VOLUME_LABEL]: claim } }],
         },
         prune: {
-          schedule: target.frequency === "weekly" ? "0 4 * * 0" : "0 4 * * *",
+          schedule: backupCron(shiftTime(target.time, 60)),
           retention: {
             keepLast: target.keepLast,
             keepDaily: target.keepDays,

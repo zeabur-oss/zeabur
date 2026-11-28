@@ -3,7 +3,6 @@ import { describe, expect, test } from "bun:test"
 import type { Schemas } from "@/api/client"
 import {
   covers,
-  hourOf,
   insideCluster,
   lastGood,
   locationForm,
@@ -112,7 +111,7 @@ describe("the location form", () => {
 describe("the schedule form", () => {
   test("starts daily at 03:00 UTC, kept a week, for the whole cluster", () => {
     expect(scheduleForm(undefined)).toEqual({
-      hour: 3,
+      time: { weekly: false, day: 0, minute: 180 },
       keepDays: 7,
       scope: "cluster",
       namespaces: [],
@@ -126,15 +125,20 @@ describe("the schedule form", () => {
   })
 
   test("a cron of another shape is kept as written", () => {
-    const weekly = schedule({ cron: "30 2 * * 0" })
-    const form = scheduleForm(weekly)
-    expect(form.hour).toBeUndefined()
-    expect(scheduleRequest({ ...form, keepDays: 14 }, weekly)).toMatchObject({
-      cron: "30 2 * * 0",
+    const monthly = schedule({ cron: "30 2 1 * *" })
+    const form = scheduleForm(monthly)
+    expect(form.time).toBeUndefined()
+    expect(scheduleRequest({ ...form, keepDays: 14 }, monthly)).toMatchObject({
+      cron: "30 2 1 * *",
       keepDays: 14,
     })
-    expect(hourOf("0 23 * * *")).toBe(23)
-    expect(hourOf("0 24 * * *")).toBeUndefined()
+  })
+
+  test("any minute of a day or a week is a time the form writes back", () => {
+    const weekly = schedule({ cron: "45 17 * * 6" })
+    const form = scheduleForm(weekly)
+    expect(form.time).toEqual({ weekly: true, day: 6, minute: 17 * 60 + 45 })
+    expect(scheduleRequest(form, weekly)).toMatchObject({ cron: "45 17 * * 6" })
   })
 
   test("chosen projects need one at least, and days are 1 to 365", () => {

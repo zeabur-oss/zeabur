@@ -20,15 +20,15 @@ import { PlanDiffs, PlanFrame } from "@/components/cluster-plan"
 import { GateTip, useHintGate } from "@/components/gate"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
-import { DestinationPicker } from "@/components/s3-fields"
+import { BackupTimeField, DestinationPicker } from "@/components/s3-fields"
 import { Schedule } from "@/components/schedule"
 import { StatusDot, StatusPill } from "@/components/status"
 import { useI18n, useT } from "@/i18n"
+import { type BackupTime, backupTimeOf, DEFAULT_TIME } from "@/lib/backup-time"
 import { formatDate } from "@/lib/format"
 import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
 import {
-  hourOf,
   insideCluster,
   lastGood,
   locationForm,
@@ -556,8 +556,6 @@ function ScheduleSection({ data, gate, onPlan }: { data: Data; gate: Gate; onPla
   )
 }
 
-const pad = (n: number) => String(n).padStart(2, "0")
-
 function ScheduleEditor({
   initial,
   current,
@@ -575,14 +573,7 @@ function ScheduleEditor({
   const id = useId()
   const { form, set, setTried, problems, error } = useCheckedForm(initial, scheduleProblems)
   const projects = useQuery(projectsQuery)
-  const custom = current && hourOf(current.cron) === undefined ? current.cron : undefined
-  const hours = [
-    ...(custom ? [{ value: "custom", label: <CustomLabel cron={custom} /> }] : []),
-    ...Array.from({ length: 24 }, (_, h) => ({
-      value: String(h),
-      label: t("clusterBackups.daily", `${pad(h)}:00`),
-    })),
-  ]
+  const custom = current && backupTimeOf(current.cron) === undefined ? current.cron : undefined
   const choices = [
     ...new Set([
       ...(projects.data?.items ?? []).filter((p) => p.adopted && !p.system).map((p) => p.name),
@@ -603,15 +594,7 @@ function ScheduleEditor({
       }}
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormField label={t("clusterBackups.time")}>
-          <Select
-            size="sm"
-            className="w-full"
-            value={form.hour === undefined ? "custom" : String(form.hour)}
-            onValueChange={(value) => set({ hour: value === "custom" ? undefined : Number(value) })}
-            items={hours}
-          />
-        </FormField>
+        <ScheduleTime custom={custom} time={form.time} onChange={(time) => set({ time })} />
         <FormField label={t("clusterBackups.keep")} errors={error("keep")}>
           <NumberInput size="sm" value={form.keepDays} onValue={(keepDays) => set({ keepDays })} />
         </FormField>
@@ -663,6 +646,38 @@ function ScheduleEditor({
       </fieldset>
       <FormButtons gate={gate} onCancel={onCancel} />
     </form>
+  )
+}
+
+/** The time a schedule runs; a cron of another shape stays until a time is picked. */
+function ScheduleTime({
+  custom,
+  time,
+  onChange,
+}: {
+  custom: string | undefined
+  time: BackupTime | undefined
+  onChange: (time: BackupTime | undefined) => void
+}) {
+  const t = useT()
+  return (
+    <>
+      {custom ? (
+        <FormField label={t("clusterBackups.time")}>
+          <Select
+            size="sm"
+            className="w-full"
+            value={time ? "pick" : "custom"}
+            onValueChange={(value) => onChange(value === "pick" ? DEFAULT_TIME : undefined)}
+            items={[
+              { value: "custom", label: <CustomLabel cron={custom} /> },
+              { value: "pick", label: t("clusterBackups.pickTime") },
+            ]}
+          />
+        </FormField>
+      ) : null}
+      {time ? <BackupTimeField value={time} onChange={onChange} /> : null}
+    </>
   )
 }
 
