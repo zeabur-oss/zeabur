@@ -1897,10 +1897,11 @@ export const zhTW: Messages = {
   "form.memoryLimit": "記憶體上限",
   "form.computeHint":
     "節點會依保留量替每個副本留出資源。副本用的記憶體超過上限時，容器會重新啟動。CPU 超過上限時會降速。",
-  "form.barUsage": (amount) => `目前用了 ${amount}`,
-  "form.barNode": (amount) => `最大節點 ${amount}`,
-  "form.barSpan": (request, limit) => `保留 ${request}，上限 ${limit}`,
-  "form.barNoMax": "沒有上限",
+  "form.largestNode": (cores: string, memory: string) => `最大的節點：${cores} 核心、${memory}`,
+  "form.nearLimit": (used, limit) =>
+    `最忙的副本已用了 ${used}，快到 ${limit} 的上限了。超過的話，容器會重新啟動。`,
+  "form.aboveRequest": (used, request) =>
+    `最忙的副本用了 ${used}，超過保留的 ${request}。節點忙的時候，它可能分到比較少。`,
   "form.badQuantity": "輸入數量，例如 0.25 核心或 512 MiB。",
   "form.badReplicas": "輸入 0 到 1000 的整數。",
   "form.badNumber": "輸入大於 0 的整數。",

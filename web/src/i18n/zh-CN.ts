@@ -1893,10 +1893,11 @@ export const zhCN: Messages = {
   "form.memoryLimit": "内存上限",
   "form.computeHint":
     "节点会按预留量为每个副本留出资源。副本使用的内存超过上限时，容器会重启。CPU 超过上限时会降速。",
-  "form.barUsage": (amount) => `当前用了 ${amount}`,
-  "form.barNode": (amount) => `最大节点 ${amount}`,
-  "form.barSpan": (request, limit) => `预留 ${request}，上限 ${limit}`,
-  "form.barNoMax": "没有上限",
+  "form.largestNode": (cores: string, memory: string) => `最大的节点：${cores} 核心、${memory}`,
+  "form.nearLimit": (used, limit) =>
+    `最忙的副本已用了 ${used}，快到 ${limit} 的上限了。超过的话，容器会重启。`,
+  "form.aboveRequest": (used, request) =>
+    `最忙的副本用了 ${used}，超过了预留的 ${request}。节点繁忙时，它可能分到的会比较少。`,
   "form.badQuantity": "输入数量，例如 0.25 核心或 512 MiB。",
   "form.badReplicas": "输入 0 到 1000 的整数。",
   "form.badNumber": "输入大于 0 的整数。",

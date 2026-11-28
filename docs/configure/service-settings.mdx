@@ -51,6 +51,8 @@ Enter **Reserved CPU**, **Maximum CPU**, **Reserved memory**, and **Maximum memo
 
 Below the fields, the form shows the CPU cores and memory of the **largest node** in the cluster. A node is one machine in the cluster. If the reserved amount is more than that, the replica fits on no machine.
 
+If the busiest replica uses 90% or more of the memory maximum, or uses more than the reserved CPU or memory, a warning appears below the fields and follows what you type. It shows only when usage data is available.
+
 ![Compute resources in service settings, showing the replica count, reserved and maximum CPU and memory, and the largest node's resources below](../images/shots/service-compute.avif)
 
 The **Size** you choose when creating a service from an image or Git sets the initial values for these fields:

@@ -15,8 +15,8 @@ import { serviceSettingsSections } from "@/modules/service-settings"
 import { refusedField } from "@/model/problem"
 import { endpointsOf, type Endpoint, type Network, type Service } from "@/model/service"
 import { AmountInput } from "@/components/amount-input"
-import { ResourceBar } from "@/components/resource-bar"
-import { busiest, containerBar, largestNode, type TypedAmounts } from "@/model/resource-bar"
+import { busiest, usageWarnings } from "@/model/usage-warning"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { FormField } from "@/components/form-field"
 import { aboveLimit, isAmount, type Dimension } from "@/lib/amount"
 import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
@@ -95,9 +95,15 @@ export function HealthChecksSection({
 }
 
 type Change = Schemas.Change
+type Amounts = {
+  cpuRequest: string
+  memoryRequest: string
+  cpuLimit: string
+  memoryLimit: string
+}
 
 /** As kube-apiserver names a field it refused. */
-const paths: Record<keyof TypedAmounts, string> = {
+const paths: Record<keyof Amounts, string> = {
   cpuRequest: "requests.cpu",
   memoryRequest: "requests.memory",
   cpuLimit: "limits.cpu",
@@ -105,46 +111,50 @@ const paths: Record<keyof TypedAmounts, string> = {
 }
 
 /** Each container's usage in its busiest replica, while metrics are available. */
-/** The most CPU and memory one node can give, or none while the nodes load. */
-function useLargestNode() {
-  const nodes = useQuery(nodesQuery).data?.items ?? []
-  return largestNode(nodes.map((n) => n.allocatable))
-}
-
 function useBusiest(project: string, service: Service) {
   const usage = useQuery(usageQuery(project))
   return busiest(service, usage.data?.state === "available" ? usage.data : undefined)
 }
 
-/** Under the CPU or the memory row: the bar for what is typed in it. */
-function AmountBar({
+/** Under the CPU or the memory row: what the busiest replica's usage says about what is typed. */
+function UsageWarnings({
   row,
   amounts,
   sample,
-  largest,
 }: {
   row: "cpuRequest" | "memoryRequest"
-  amounts: TypedAmounts | undefined
+  amounts: Amounts | undefined
   sample: { cpu: number; memory: number } | undefined
-  largest: Schemas.Resources | undefined
 }) {
   const t = useT()
   const { millicores, memory } = useQuantityFormat()
-  const dimension: Dimension = row === "cpuRequest" ? "cpu" : "bytes"
-  const bar = containerBar(dimension, amounts, sample, largest)
-  if (!bar) return null
-  const show = dimension === "cpu" ? (cores: number) => millicores(cores * 1000) : memory
-  const usage = bar.usage === undefined ? undefined : t("form.barUsage", show(bar.usage))
-  const node = t("form.barNode", show(bar.node))
-  const span = t("form.barSpan", bar.request || "0", bar.limit || t("form.barNoMax"))
+  const cpu = row === "cpuRequest"
+  if (!amounts || !sample) return null
+  const show = cpu ? (cores: number) => millicores(cores * 1000) : memory
+  const used = cpu ? sample.cpu : sample.memory
+  const { nearLimit, aboveRequest } = usageWarnings(
+    cpu ? "cpu" : "bytes",
+    cpu ? amounts.cpuRequest : amounts.memoryRequest,
+    cpu ? amounts.cpuLimit : amounts.memoryLimit,
+    used,
+  )
+  if (!nearLimit && !aboveRequest) return null
   return (
-    <div className="sm:col-span-2">
-      <ResourceBar
-        shares={bar.shares}
-        usage={usage}
-        largest={node}
-        label={[span, usage, node].filter(Boolean).join(t("common.sep"))}
-      />
+    <div className="flex flex-col gap-2 sm:col-span-2">
+      {nearLimit ? (
+        <Alert variant="warn" role="note">
+          <AlertDescription>
+            {t("form.nearLimit", show(used), show(nearLimit.limit))}
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {aboveRequest ? (
+        <Alert variant="warn" role="note">
+          <AlertDescription>
+            {t("form.aboveRequest", show(used), show(aboveRequest.request))}
+          </AlertDescription>
+        </Alert>
+      ) : null}
     </div>
   )
 }
@@ -163,13 +173,19 @@ function Compute({
   refused: Schemas.FieldCause[]
 }) {
   const t = useT()
+  const { cores, memory } = useQuantityFormat()
   const used = useBusiest(project, service)
-  const largest = useLargestNode()
+  const nodes = useQuery(nodesQuery)
+  const largest = nodes.data?.items.reduce<Schemas.Resources | undefined>(
+    (best, node) =>
+      !best || node.allocatable.memoryBytes > best.memoryBytes ? node.allocatable : best,
+    undefined,
+  )
   const scalable = service.kind === "Deployment" || service.kind === "StatefulSet"
   const containers = service.containers.filter((c) => !c.init)
   const initial = {
     replicas: String(service.replicas?.desired ?? 1),
-    containers: containers.map((c): TypedAmounts => ({
+    containers: containers.map((c): Amounts => ({
       cpuRequest: c.resources?.requests?.cpu ?? "",
       memoryRequest: c.resources?.requests?.memory ?? "",
       cpuLimit: c.resources?.limits?.cpu ?? "",
@@ -323,16 +339,20 @@ function Compute({
                   </form.Field>
                 )
               })}
-              <AmountBar
+              <UsageWarnings
                 row={row[0][0]}
                 amounts={values.containers[index]}
                 sample={used.get(container.name)}
-                largest={largest}
               />
             </div>
           ))}
         </fieldset>
       ))}
+      {largest ? (
+        <p className="type-meta text-muted-foreground">
+          {t("form.largestNode", cores(largest.cpuMillicores), memory(largest.memoryBytes))}
+        </p>
+      ) : null}
     </form>
   )
 }
