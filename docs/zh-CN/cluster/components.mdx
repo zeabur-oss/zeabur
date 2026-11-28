@@ -7,6 +7,8 @@ description: 查看集群安装了哪些组件、状态如何、还缺什么，�
 
 ![集群组件页的已安装列表和目录](../images/shots/cluster-components.avif)
 
+卡片显示组件用多少内存，数字来自 Zeabur Catalog 在新集群上测得的 Pod 用量。会做工作的组件，例如构建，数字包含一次这种工作：Zeabur Builder 的数字是运行一次构建的用量。Zeabur 开源版不检查集群有没有这么多空闲内存，请和**集群** → **节点**上的剩余内存比较。
+
 ## 开始之前
 
 你需要有权限读取整个集群的 CRD、IngressClass 和各 Namespace 的工作负载，组件页才能检测到已安装的组件。

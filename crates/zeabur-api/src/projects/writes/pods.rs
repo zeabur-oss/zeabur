@@ -37,6 +37,8 @@ use crate::error::ApiError;
 /// A workload whose pods the plan adds.
 struct Added<'p> {
     object: &'p PlannedObject,
+    /// Its index in the plan.
+    index: usize,
     template: PodTemplateSpec,
     /// A StatefulSet's `volumeClaimTemplates`.
     claims: Vec<PersistentVolumeClaim>,
@@ -100,7 +102,7 @@ fn parse<K: DeserializeOwned>(kind: &str, object: &Value) -> Result<K, ApiError>
 /// The Deployments and StatefulSets `plan` starts or scales up, with the pods each adds.
 fn added<'p>(request: &PlanRequest, plan: &'p Plan) -> Result<Vec<Added<'p>>, ApiError> {
     let mut added = Vec::new();
-    for object in &plan.objects {
+    for (index, object) in plan.objects.iter().enumerate() {
         let kind = object.target.kind.as_str();
         if object.target.api_version != "apps/v1"
             || matches!(object.write, Write::Delete { .. })
@@ -121,6 +123,7 @@ fn added<'p>(request: &PlanRequest, plan: &'p Plan) -> Result<Vec<Added<'p>>, Ap
         if let (true, Some(template)) = (pods > 0, after.template) {
             added.push(Added {
                 object,
+                index,
                 template,
                 claims: after.claims,
                 pods,
@@ -143,16 +146,18 @@ fn changed_by(request: &PlanRequest, object: &PlannedObject) -> Option<usize> {
 }
 
 /// Refuses `plan` when a Pod it starts would be refused, or when its pods together would go
-/// over a quota, at the change of the workload that crosses it.
+/// over a quota, at the change of the workload that crosses it. Returns what kube-apiserver
+/// warned about each workload's Pod, by the workload's index in `plan`.
 pub(super) async fn dry_run(
     cluster: &dyn Cluster,
     project: &str,
     request: &PlanRequest,
     plan: &Plan,
-) -> Result<(), ApiError> {
+) -> Result<Vec<(usize, Vec<String>)>, ApiError> {
     let added = added(request, plan)?;
+    let mut warned = Vec::new();
     if added.is_empty() {
-        return Ok(());
+        return Ok(warned);
     }
     let quotas = cluster
         .list::<ResourceQuota>(Some(project))
@@ -160,7 +165,11 @@ pub(super) async fn dry_run(
         .unwrap_or_default();
     let mut need = Need::default();
     for workload in &added {
-        let Some(pod) = admitted(cluster, project, plan, workload).await? else {
+        let (pod, warnings) = admitted(cluster, project, plan, workload).await?;
+        if !warnings.is_empty() {
+            warned.push((workload.index, warnings));
+        }
+        let Some(pod) = pod else {
             continue;
         };
         let (requests, limits) = pod_amounts(&pod);
@@ -174,16 +183,17 @@ pub(super) async fn dry_run(
             return Err(ApiError::from(problem));
         }
     }
-    Ok(())
+    Ok(warned)
 }
 
-/// One Pod of `workload` as kube-apiserver admits it; `None` when that is not known.
+/// One Pod of `workload` as kube-apiserver admits it, `None` when that is not known, and what
+/// kube-apiserver warned about it.
 async fn admitted(
     cluster: &dyn Cluster,
     project: &str,
     plan: &Plan,
     workload: &Added<'_>,
-) -> Result<Option<ClusterPod>, ApiError> {
+) -> Result<(Option<ClusterPod>, Vec<String>), ApiError> {
     // Generated, so a Pod already named like it can't answer 409 in place of admission.
     let name = format!("{}-dry-run-", workload.object.target.name);
     let target = Target::of::<Pod>(&name);
@@ -203,21 +213,24 @@ async fn admitted(
         )
     };
     match cluster.write(&write).await {
-        Ok(written) => written
-            .object
-            .map(|object| {
-                ClusterPod::from_object(object).map_err(|error| {
-                    ApiError::from(Problem::new(
-                        Kind::Internal,
-                        format!("kube-apiserver answered the dry-run Pod with no Pod: {error}"),
-                    ))
+        Ok(written) => {
+            let pod = written
+                .object
+                .map(|object| {
+                    ClusterPod::from_object(object).map_err(|error| {
+                        ApiError::from(Problem::new(
+                            Kind::Internal,
+                            format!("kube-apiserver answered the dry-run Pod with no Pod: {error}"),
+                        ))
+                    })
                 })
-            })
-            .transpose(),
+                .transpose()?;
+            Ok((pod, written.warnings))
+        }
         Err(error) => {
             let mut problem = refused(cluster, project, &target, &write, error).await;
             if !matches!(problem.kind, Kind::QuotaExceeded | Kind::PolicyDenied) {
-                return Ok(None);
+                return Ok((None, Vec::new()));
             }
             problem.at = at(workload);
             Err(ApiError::from(without_secret_values(problem, plan)))
@@ -386,6 +399,7 @@ mod tests {
     fn account_of(plan: &Plan) -> Option<String> {
         let workload = Added {
             object: &plan.objects[0],
+            index: 0,
             template: PodTemplateSpec {
                 metadata: None,
                 spec: Some(PodSpec {
@@ -422,6 +436,7 @@ mod tests {
         };
         let workload = Added {
             object: &plan.objects[0],
+            index: 0,
             template: PodTemplateSpec {
                 metadata: None,
                 spec: Some(PodSpec {

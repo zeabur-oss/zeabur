@@ -1201,6 +1201,11 @@ pub struct PlannedObject {
     /// For an object a `create` makes, the index of that change in the request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub change: Option<usize>,
+    /// What kube-apiserver warned about when the plan dry-ran the write, or a Pod the write
+    /// starts, as the text of its `Warning` headers: Pod Security admission, a deprecated API, a
+    /// `ValidatingAdmissionPolicy` that warns. Empty for a write the plan does not dry-run.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
     /// The object as it will be, unredacted: for re-projection only, never sent; `Null` when the
     /// write deletes it.
     #[serde(skip)]

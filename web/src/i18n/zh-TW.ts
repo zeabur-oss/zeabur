@@ -1216,6 +1216,10 @@ export const zhTW: Messages = {
   "components.packaged": (by, chart) =>
     `這是 ${by} 的內建元件。要改設定，請建立名為 ${chart} 的 HelmChartConfig。`,
   "components.packagedHow": "範例",
+  "components.memoryIdle": (idle) => `閒置時約用 ${idle} 記憶體。`,
+  "components.memoryBuild": (total, idle) => `跑一次建置時約用 ${total} 記憶體，閒置時約 ${idle}。`,
+  "components.memoryLoad": (total, idle) => `有負載時約用 ${total} 記憶體，閒置時約 ${idle}。`,
+  "components.memoryWork": (total, idle) => `工作時約用 ${total} 記憶體，閒置時約 ${idle}。`,
   "components.packagedAnchor": "修改內建元件的設定",
   "components.values": "設定值",
   "components.required": "必填",

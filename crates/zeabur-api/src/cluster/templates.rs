@@ -287,6 +287,7 @@ mod tests {
             },
             tested_version: None,
             unsupported: None,
+            memory: None,
         }
     }
 

@@ -153,6 +153,61 @@ stringData:
         assert_eq!(secret["metadata"]["namespace"], "shop");
     }
 
+    /// What kube-apiserver warns about the plan's dry runs, of the object and of a Pod it starts,
+    /// is shown at the object; an object without warnings has none.
+    #[tokio::test]
+    async fn the_plan_shows_what_its_dry_runs_warn_about() {
+        let cluster = cluster();
+        let deprecated = "apps/v1 Deployment field is deprecated";
+        let pod_security = "would violate PodSecurity \"restricted:latest\": runAsNonRoot != true";
+        cluster.update(|s| {
+            s.write_warnings
+                .insert("Deployment/api".to_owned(), vec![deprecated.to_owned()]);
+            s.write_warnings
+                .insert("Pod/api-dry-run-".to_owned(), vec![pod_security.to_owned()]);
+        });
+        let (status, planned) = plan(&app(&cluster), &creates(&[DEPLOYMENT, SERVICE])).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        let warnings: Vec<(&str, &Value)> = planned["objects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|o| (o["target"]["kind"].as_str().unwrap(), &o["warnings"]))
+            .collect();
+        assert_eq!(
+            warnings,
+            [
+                ("Service", &Value::Null),
+                ("Deployment", &json!([deprecated, pod_security])),
+            ]
+        );
+    }
+
+    /// A warning that quotes a value of a Secret the plan writes, as written or in base64, shows
+    /// it hidden, as a refusal does.
+    #[tokio::test]
+    async fn a_warning_never_quotes_a_secret_value() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.write_warnings.insert(
+                "Deployment/api".to_owned(),
+                vec!["env TOKEN=s3cr3t-t0ken (czNjcjN0LXQwa2Vu) is plain text".to_owned()],
+            );
+        });
+        let (status, planned) = plan(&app(&cluster), &creates(&[DEPLOYMENT, SECRET])).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        let deployment = planned["objects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|o| o["target"]["kind"] == "Deployment")
+            .unwrap();
+        assert_eq!(
+            deployment["warnings"],
+            json!(["env TOKEN=(hidden) ((hidden)) is plain text"])
+        );
+    }
+
     /// The "Docker image" form sends the service, and the server makes its objects: a Deployment,
     /// its Service, an Ingress asking the configured issuer for HTTPS, and a volume claim, planned
     /// without discovery and created claim first, Ingress last. Its YAML hand-off lists the same

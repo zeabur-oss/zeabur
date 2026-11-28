@@ -625,6 +625,7 @@ mod tests {
             resource_version: None,
             write,
             change: None,
+            warnings: Vec::new(),
             raw_after: if deletes { Value::Null } else { body },
         }
     }

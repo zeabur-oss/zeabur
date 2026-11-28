@@ -1327,6 +1327,75 @@ export type BuiltServiceChange = {
 }
 
 /**
+ * What one pod of a workload used once idle.
+ */
+export type MeasuredPod = {
+  /**
+   * Its CPU in millicores.
+   * @minimum 0
+   */
+  cpuMillicores: number
+  /**
+   * Its working set in bytes.
+   * @minimum 0
+   */
+  memoryBytes: number
+  /** The workload or database object (`miniflux-db`). */
+  workload: string
+}
+
+/**
+ * What a template's or a component's pods used once idle, on a fresh cluster after its smoke
+ * checks.
+ */
+export type IdleUse = {
+  /**
+   * The pods' CPU in millicores.
+   * @minimum 0
+   */
+  cpuMillicores: number
+  /** Where it was measured: `<distribution>-<profile>-<architecture>-<Kubernetes version>`. */
+  environment: string
+  /** The day it was measured. */
+  measuredAt: string
+  /**
+   * The pods' working set in bytes.
+   * @minimum 0
+   */
+  memoryBytes: number
+  /** Each workload's pod. */
+  pods: MeasuredPod[]
+}
+
+/**
+ * What one unit of a component's work uses on top of its idle use, as the catalogue declares it.
+ */
+export type WorkUse = {
+  /**
+   * Its memory in bytes.
+   * @minimum 0
+   */
+  memoryBytes: number
+  /** The work's name in the catalogue (`build`). */
+  name: string
+}
+
+/**
+ * The memory a component uses: its measured idle use plus one unit of its heaviest work.
+ */
+export type ComponentMemory = {
+  /** What its pods used once idle. */
+  idle: IdleUse
+  /**
+   * The idle memory plus the work's: what the component uses while it does one unit of that
+   * work, such as one build.
+   * @minimum 0
+   */
+  totalBytes: number
+  work?: WorkUse | null
+}
+
+/**
  * What a component uses that Zeabur cannot install yet.
  */
 export type Unsupported = (typeof Unsupported)[keyof typeof Unsupported]
@@ -1370,6 +1439,7 @@ export type Component = {
   id: string
   /** Its licence (SPDX). */
   license: string
+  memory?: ComponentMemory | null
   /**
    * What it gives the cluster, in one sentence, by language tag (`en`, `zh-TW`, `zh-CN`);
    * `en` is always there.
@@ -4234,6 +4304,15 @@ export type ObjectWrite = {
   namespace?: string | null
   /** What the write does. */
   op: WriteOp
+  /**
+   * What kube-apiserver warned about when the plan dry-ran the write, as the text of its
+   * `Warning` headers. The plan dry-runs the change of a Namespace that exists, so Pod
+   * Security admission names the Pods in it that break a new `enforce` level
+   * [k8s-psa-labels]; empty for other writes.
+   *
+   * [k8s-psa-labels]: https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces
+   */
+  warnings?: string[]
   /**
    * The object as it is written, YAML; absent for a deletion.
    * @nullable
@@ -7150,46 +7229,6 @@ export type Hop = {
 }
 
 /**
- * What one pod of a workload used once idle.
- */
-export type MeasuredPod = {
-  /**
-   * Its CPU in millicores.
-   * @minimum 0
-   */
-  cpuMillicores: number
-  /**
-   * Its working set in bytes.
-   * @minimum 0
-   */
-  memoryBytes: number
-  /** The workload or database object (`miniflux-db`). */
-  workload: string
-}
-
-/**
- * What a template's pods used once idle, on a fresh cluster after its smoke checks.
- */
-export type IdleUse = {
-  /**
-   * The pods' CPU in millicores.
-   * @minimum 0
-   */
-  cpuMillicores: number
-  /** Where it was measured: `<distribution>-<profile>-<architecture>-<Kubernetes version>`. */
-  environment: string
-  /** The day it was measured. */
-  measuredAt: string
-  /**
-   * The pods' working set in bytes.
-   * @minimum 0
-   */
-  memoryBytes: number
-  /** Each workload's pod. */
-  pods: MeasuredPod[]
-}
-
-/**
  * Why an image's configuration could not be read.
  */
 export type UnreadableReason = (typeof UnreadableReason)[keyof typeof UnreadableReason]
@@ -8875,6 +8914,12 @@ export type PlannedObject = {
   resourceVersion?: string | null
   /** The object. */
   target: PlanTarget
+  /**
+   * What kube-apiserver warned about when the plan dry-ran the write, or a Pod the write
+   * starts, as the text of its `Warning` headers: Pod Security admission, a deprecated API, a
+   * `ValidatingAdmissionPolicy` that warns. Empty for a write the plan does not dry-run.
+   */
+  warnings?: string[]
   /** The write. */
   write: PlannedWrite
 }

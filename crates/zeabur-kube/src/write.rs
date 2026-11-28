@@ -1,6 +1,6 @@
-//! Writes as the person: one request per object. Patches go through kube's `Api::patch` with
-//! `PatchParams`; a creation is built by hand, because kube's `PostParams` cannot ask for strict
-//! field validation.
+//! Writes as the person: one request per object. Patches and deletions are built with kube's
+//! `Request`; the query, the creation and the send are in [`crate::request`]. Each answer's
+//! `Warning` headers come back in [`Written::warnings`].
 //!
 //! - **A change** is a `PATCH` with `application/json-patch+json` [rfc6902] (kube's `Patch::Json`);
 //!   its `test` operations make it all-or-nothing against what the plan read.
@@ -9,7 +9,7 @@
 //! - **A new object** is a `POST` to its collection.
 //! - **An applied object** is a server-side apply `PATCH` [k8s-ssa] (kube's `Patch::Apply`), never
 //!   forced.
-//! - **A deletion** is kube's `Api::delete` with `DeleteOptions` in its body [k8s-delete-options]:
+//! - **A deletion** is a `DELETE` with `DeleteOptions` in its body [k8s-delete-options]:
 //!   `propagationPolicy: Background`, as `kubectl delete` does by default, so kube-apiserver
 //!   removes the object at once and the garbage collector removes what it owns (a Deployment's
 //!   ReplicaSets and their Pods) afterwards [k8s-gc], or `Foreground` when asked, so the object
@@ -31,13 +31,11 @@
 //! [k8s-ssa]: https://kubernetes.io/docs/reference/using-api/server-side-apply/
 //! [k8s-gc]: https://kubernetes.io/docs/concepts/architecture/garbage-collection/#background-deletion
 
-use kube::api::{Api, DeleteParams, DynamicObject, Patch, PatchParams};
-use kube::core::{ApiResource, GroupVersionKind};
+use kube::api::{DynamicObject, Patch};
+use kube::core::Request;
 
-use crate::names;
-use crate::port::{
-    ClusterError, FIELD_MANAGER, ObjectTarget, Preconditions, WriteBody, WriteRequest, Written,
-};
+use crate::port::{ClusterError, ObjectTarget, WriteBody, WriteRequest, Written};
+use crate::{names, request};
 
 /// The URL path of `target`'s collection: `/api/v1/…` for the core group,
 /// `/apis/{group}/{version}/…` otherwise; without `namespaces/{namespace}/` for a cluster-scoped
@@ -102,19 +100,6 @@ fn encode(segment: &str) -> String {
         .collect()
 }
 
-/// The query string of a creation. A deletion writes no fields, so it names no field manager and
-/// no field validation, and its dry run goes in its body ([`delete_params`]).
-fn query(request: &WriteRequest) -> String {
-    let mut parts = vec![
-        format!("fieldManager={FIELD_MANAGER}"),
-        "fieldValidation=Strict".to_owned(),
-    ];
-    if request.dry_run {
-        parts.push("dryRun=All".to_owned());
-    }
-    parts.join("&")
-}
-
 /// Sends `request` as the person `client` is bound to.
 pub(crate) async fn write(
     client: &kube::Client,
@@ -124,87 +109,68 @@ pub(crate) async fn write(
         &request.target,
         !matches!(request.body, WriteBody::Create(_)),
     )?;
-    let api = api(client, &request.target);
+    let path = Request::new(collection_path(&request.target));
     let name = request.target.name.as_str();
-    let patch_params = patch_params(request);
-    let answer = match &request.body {
+    let patch_params = request::patch_params(request.dry_run);
+    let built = match &request.body {
         WriteBody::Create(object) => {
-            let http_request = http::Request::post(format!(
-                "{}?{}",
-                collection_path(&request.target),
-                query(request)
-            ))
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .header(http::header::ACCEPT, "application/json")
-            .body(serde_json::to_vec(object).map_err(|e| ClusterError::Decode(e.to_string()))?)
-            .map_err(|e| ClusterError::Transport(e.to_string()))?;
-            client.request::<DynamicObject>(http_request).await?
+            request::create(&collection_path(&request.target), object, request.dry_run)
         }
-        WriteBody::JsonPatch(operations) => {
-            api.patch(name, &patch_params, &json_patch(operations)?)
-                .await?
-        }
-        WriteBody::MergePatch(body) => api.patch(name, &patch_params, &Patch::Merge(body)).await?,
-        WriteBody::Apply(object) => {
-            api.patch(name, &patch_params, &Patch::Apply(object))
-                .await?
-        }
-        WriteBody::EphemeralContainers(operations) => {
-            api.patch_subresource(
+        WriteBody::JsonPatch(operations) => path
+            .patch(name, &patch_params, &json_patch(operations)?)
+            .map_err(|e| built_wrong(&e)),
+        WriteBody::MergePatch(body) => path
+            .patch(name, &patch_params, &Patch::Merge(body))
+            .map_err(|e| built_wrong(&e)),
+        WriteBody::Apply(object) => path
+            .patch(name, &patch_params, &Patch::Apply(object))
+            .map_err(|e| built_wrong(&e)),
+        WriteBody::EphemeralContainers(operations) => path
+            .patch_subresource(
                 "ephemeralcontainers",
                 name,
                 &patch_params,
                 &json_patch(operations)?,
             )
-            .await?
-        }
-        WriteBody::Delete(preconditions) => {
-            let answer = api
-                .delete(name, &delete_params(preconditions, request.dry_run))
-                .await?;
+            .map_err(|e| built_wrong(&e)),
+        WriteBody::Delete(preconditions) => path
+            .delete(
+                name,
+                &request::delete_params(preconditions, request.dry_run),
+            )
+            .map_err(|e| built_wrong(&e)),
+    }?;
+    let (body, warnings) = request::send(client, built).await?;
+    let answer: DynamicObject = match serde_json::from_slice(&body) {
+        Ok(answer) => answer,
+        // A deletion that kube-apiserver finished at once answers with a `Status`.
+        Err(_status) if matches!(request.body, WriteBody::Delete(_)) => {
             return Ok(Written {
-                resource_version: answer.left().and_then(|o| o.metadata.resource_version),
-                generation: None,
-                uid: None,
-                object: None,
+                warnings,
+                ..Written::default()
             });
         }
+        Err(error) => return Err(ClusterError::Decode(error.to_string())),
     };
+    if matches!(request.body, WriteBody::Delete(_)) {
+        return Ok(Written {
+            resource_version: answer.metadata.resource_version,
+            warnings,
+            ..Written::default()
+        });
+    }
     let object = serde_json::to_value(&answer).ok();
     Ok(Written {
         resource_version: answer.metadata.resource_version,
         generation: answer.metadata.generation,
         uid: answer.metadata.uid,
         object,
+        warnings,
     })
 }
 
-/// The client of `target`'s kind, namespaced unless the object is cluster-scoped.
-fn api(client: &kube::Client, target: &ObjectTarget) -> Api<DynamicObject> {
-    let (group, version) = target
-        .api_version
-        .split_once('/')
-        .unwrap_or(("", target.api_version.as_str()));
-    let resource = ApiResource::from_gvk_with_plural(
-        &GroupVersionKind::gvk(group, version, &target.kind),
-        &target.plural,
-    );
-    if target.namespace.is_empty() {
-        Api::all_with(client.clone(), &resource)
-    } else {
-        Api::namespaced_with(client.clone(), &target.namespace, &resource)
-    }
-}
-
-/// Names the field manager and asks for strict field validation, so a field the object's schema
-/// does not know fails the request instead of being dropped silently; a dry run adds `dryRun=All`.
-fn patch_params(request: &WriteRequest) -> PatchParams {
-    let params = PatchParams {
-        dry_run: request.dry_run,
-        field_manager: Some(FIELD_MANAGER.to_owned()),
-        ..PatchParams::default()
-    };
-    params.validation_strict()
+fn built_wrong(error: &kube::core::request::Error) -> ClusterError {
+    ClusterError::Transport(error.to_string())
 }
 
 /// The operations of a plan as kube's JSON Patch.
@@ -212,29 +178,6 @@ fn json_patch(operations: &serde_json::Value) -> Result<Patch<()>, ClusterError>
     serde_json::from_value(operations.clone())
         .map(Patch::Json)
         .map_err(|e| ClusterError::Decode(e.to_string()))
-}
-
-/// The options of a deletion [k8s-delete-options], which kube sends as its body, the dry run
-/// included: kube-apiserver reads a deletion's options from its body when it has one and only
-/// otherwise from the query string [delete-handler], so a `dryRun=All` query beside a body would
-/// be ignored and the object deleted for real.
-///
-/// [k8s-delete-options]: https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/delete-options/
-/// [delete-handler]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/endpoints/handlers/delete.go
-pub(crate) fn delete_params(preconditions: &Preconditions, dry_run: bool) -> DeleteParams {
-    DeleteParams {
-        dry_run,
-        preconditions: Some(kube::api::Preconditions {
-            uid: preconditions.uid.clone(),
-            resource_version: preconditions.resource_version.clone(),
-        }),
-        grace_period_seconds: preconditions.grace_period_seconds,
-        ..if preconditions.foreground {
-            DeleteParams::foreground()
-        } else {
-            DeleteParams::background()
-        }
-    }
 }
 
 #[cfg(test)]
@@ -314,71 +257,5 @@ mod tests {
             ..target("v1", "namespaces")
         };
         assert_eq!(collection_path(&namespace), "/api/v1/namespaces");
-    }
-
-    #[test]
-    fn every_write_names_the_manager_and_asks_for_strict_validation() {
-        let mut request = WriteRequest {
-            target: target("apps/v1", "deployments"),
-            body: WriteBody::Create(serde_json::json!({})),
-            dry_run: true,
-        };
-        assert_eq!(
-            query(&request),
-            "fieldManager=zeabur&fieldValidation=Strict&dryRun=All"
-        );
-        request.body = WriteBody::JsonPatch(serde_json::json!([]));
-        let params = patch_params(&request);
-        assert_eq!(params.field_manager.as_deref(), Some("zeabur"));
-        assert_eq!(
-            params
-                .field_validation
-                .as_ref()
-                .map(kube::api::ValidationDirective::as_str),
-            Some("Strict")
-        );
-        assert!(params.dry_run);
-        request.dry_run = false;
-        assert!(!patch_params(&request).dry_run);
-        assert_eq!(
-            query(&request),
-            "fieldManager=zeabur&fieldValidation=Strict"
-        );
-    }
-
-    #[test]
-    fn a_deletion_propagates_in_the_background_and_names_its_preconditions() {
-        let preconditions = Preconditions {
-            uid: Some("u-1".to_owned()),
-            resource_version: Some("42".to_owned()),
-            grace_period_seconds: None,
-            foreground: false,
-        };
-        let body = |dry_run| serde_json::to_value(delete_params(&preconditions, dry_run)).unwrap();
-        let options = body(false);
-        assert_eq!(options["propagationPolicy"], "Background");
-        assert_eq!(
-            options["preconditions"],
-            serde_json::json!({"uid": "u-1", "resourceVersion": "42"})
-        );
-        assert_eq!(options.get("dryRun"), None);
-        assert_eq!(body(true)["dryRun"], serde_json::json!(["All"]));
-    }
-
-    #[test]
-    fn a_foreground_deletion_asks_for_foreground_propagation() {
-        let preconditions = Preconditions {
-            uid: Some("u-1".to_owned()),
-            resource_version: Some("42".to_owned()),
-            grace_period_seconds: None,
-            foreground: true,
-        };
-        assert_eq!(
-            serde_json::to_value(delete_params(&preconditions, false)).unwrap(),
-            serde_json::json!({
-                "propagationPolicy": "Foreground",
-                "preconditions": { "uid": "u-1", "resourceVersion": "42" },
-            })
-        );
     }
 }
