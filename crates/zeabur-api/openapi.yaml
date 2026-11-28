@@ -11556,7 +11556,7 @@ components:
         description: A whole number.
       - type: string
         description: Text.
-      description: "An input's value: the catalog's `default`, or what a person gives."
+      description: The value of an input.
     InspectRequest:
       type: object
       description: The image to read.

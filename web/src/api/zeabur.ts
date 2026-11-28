@@ -4205,7 +4205,7 @@ export type ComponentCheck = {
 }
 
 /**
- * An input's value: the catalog's `default`, or what a person gives.
+ * The value of an input.
  */
 export type InputValue = boolean | number | string
 
