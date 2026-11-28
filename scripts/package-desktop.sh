@@ -11,7 +11,7 @@
 # the runner's own tools, not the shell's rg or yq. It needs on PATH
 # cargo and rustc of the nightly flake.lock pins and cargo-tauri; in the environment
 # ZEABUR_CATALOG_RELEASE, ZEABUR_CATALOG_COMMIT and ZEABUR_UI_DIST, as the dev shell sets them; and
-# desktop/web/dist built. The desktop-prepare job of .github/workflows/release.yml prepares all of
+# desktop/web/dist built. The prepare job of .github/workflows/release.yml prepares all of
 # this.
 #
 # Signing:
@@ -151,33 +151,14 @@ case "$os" in
     ;;
 
   windows)
+    source "$root/scripts/azure-signtool.sh"
     sign=()
-    if [[ -n "${AZURE_SIGNING_ENDPOINT:-}" ]]; then
-      # Microsoft's signtool plug-in for Azure Artifact Signing, pinned by version and digest. It
-      # signs with the Azure CLI login of azure/login.
-      dlib_version=1.0.151
-      dlib_sha256=35375a4bc4e1102da729fc3d8d9925f774c3baae6b8b7ff6398d948ca9ab0d8a
-      curl --fail --silent --show-error --location --retry 3 --output "$work/dlib.nupkg" \
-        "https://api.nuget.org/v3-flatcontainer/microsoft.artifactsigning.client/$dlib_version/microsoft.artifactsigning.client.$dlib_version.nupkg"
-      echo "$dlib_sha256  $work/dlib.nupkg" | sha256sum --check --status
-      unzip -q "$work/dlib.nupkg" -d "$work/dlib"
-      jq -n --arg endpoint "$AZURE_SIGNING_ENDPOINT" --arg account "$AZURE_SIGNING_ACCOUNT" \
-        --arg profile "$AZURE_SIGNING_PROFILE" \
-        '{Endpoint: $endpoint, CodeSigningAccountName: $account, CertificateProfileName: $profile}' \
-        >"$work/metadata.json"
-      signtool=$(find "/c/Program Files (x86)/Windows Kits/10/bin" -path '*/x64/signtool.exe' | sort -V | tail -n 1)
-      sign=("$(cygpath -w "$signtool")" sign /v /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256
-        /dlib "$(cygpath -w "$work/dlib/bin/x64/Azure.CodeSigning.Dlib.dll")"
-        /dmdf "$(cygpath -w "$work/metadata.json")")
-    else
-      echo "::warning::no Azure Artifact Signing account: the Windows files are not signed"
-    fi
+    azure_signtool "$work"
     # The portable .exe is the plain build. The bundler then marks the binary as the installer's,
     # so the copy is taken before it bundles.
     cp "$CARGO_TARGET_DIR/release/zeabur-desktop.exe" "$out/$name-portable.exe"
     config=()
     if [[ ${#sign[@]} -gt 0 ]]; then
-      # SignTool takes /fd, /tr and the like literally; Git Bash must not turn them into paths.
       MSYS2_ARG_CONV_EXCL="*" "${sign[@]}" "$(cygpath -w "$out/$name-portable.exe")"
       MSYS2_ARG_CONV_EXCL="*" jq -n --arg cmd "${sign[0]}" '$ARGS.positional as $args |
         {bundle: {windows: {signCommand: {cmd: $cmd, args: ($args + ["%1"])}}}}' \

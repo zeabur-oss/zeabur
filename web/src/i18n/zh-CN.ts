@@ -2850,10 +2850,18 @@ export const zhCN: Messages = {
   "db.connect": "连接",
   "db.inCluster": "这些信息只能在集群内部使用。",
   "db.outside.title": "从集群外连接",
-  "db.outside.commandHint":
-    "在你的电脑上运行。它会通过集群把本机的一个端口接到数据库，并打印 127.0.0.1 的连接字符串。按 Ctrl-C 才会停止。",
+  "db.outside.install":
+    "安装 zeaburctl：macOS 和 Linux 可以用 Homebrew，Windows 请下载可执行文件。",
+  "db.outside.kubeconfig":
+    "获取这个集群的 kubeconfig。如果你是用 zeaburctl ui 打开 Zeabur 的，就已经有了；否则请管理员为你创建 API 令牌，令牌会附带 kubeconfig。",
+  "db.outside.tokens": "API 令牌",
+  "db.outside.run":
+    "在你的电脑上运行上面的命令。如果 kubeconfig 当前的 context 是其他集群，请加上 --context 和这个集群的 context 名称。",
+  "db.outside.client":
+    "把它输出的连接字符串粘贴到数据库客户端，例如 TablePlus 或 DBeaver。它连接到 127.0.0.1，在按 Ctrl-C 之前都可以使用。",
+  "db.outside.reference": "zeaburctl connect 的用法",
   "db.outside.refused": (reason) => `集群会拒绝你运行这条命令。${reason}。`,
-  "db.outside.docs": "安装 zeaburctl",
+  "db.outside.docs": "安装步骤",
   "db.noDatabase": "这个集群没有应用数据库。服务以 moco-writable 连接，这个用户可以创建数据库。",
   "db.noAuth": (engine) => `这个 ${engine} 没有设置密码，集群里的任何程序都能连接。`,
   "db.export": "导出",

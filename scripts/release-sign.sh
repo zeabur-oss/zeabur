@@ -106,7 +106,7 @@ fi
 notarize "$zeaburctl"
 "$zeaburctl" --version
 
-# Pack the archive again the same way as release-build.sh, so it stays reproducible.
+# Pack the archive again the same way as release-build-zeaburctl.sh, so it stays reproducible.
 commit_time=$(git show -s --format=%ct HEAD)
 tar --format=ustar --sort=name --mtime="@$commit_time" \
   --owner=0 --group=0 --numeric-owner \

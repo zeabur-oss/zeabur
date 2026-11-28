@@ -1,3 +1,5 @@
+import { Link } from "@tanstack/react-router"
+
 import { CopyText } from "@/components/copy-text"
 import { DocsLink } from "@/components/docs-link"
 import { useGate, useGateReason } from "@/components/gate"
@@ -20,11 +22,26 @@ export function Outside({ project, database }: { project: string; database: Data
           <CopyText value={() => command} label={t("common.copy")} />
         </CardRow>
       </CardRows>
-      <p className="type-meta text-muted-foreground">{t("db.outside.commandHint")}</p>
+      <ol className="flex list-decimal flex-col gap-1.5 pl-5 type-meta text-muted-foreground">
+        <li>
+          {t("db.outside.install")}{" "}
+          <DocsLink page="reference/zeaburctl">{t("db.outside.docs")}</DocsLink>
+        </li>
+        <li>
+          {t("db.outside.kubeconfig")}{" "}
+          <Link to="/members" className="text-foreground underline underline-offset-2">
+            {t("db.outside.tokens")}
+          </Link>
+        </li>
+        <li>{t("db.outside.run")}</li>
+        <li>{t("db.outside.client")}</li>
+      </ol>
       {reason ? (
         <p className="type-meta text-warn-strong">{t("db.outside.refused", reason)}</p>
       ) : null}
-      <DocsLink page="reference/zeaburctl">{t("db.outside.docs")}</DocsLink>
+      <DocsLink page="reference/zeaburctl" anchor="connect">
+        {t("db.outside.reference")}
+      </DocsLink>
     </Section>
   )
 }

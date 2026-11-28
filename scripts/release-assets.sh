@@ -13,11 +13,12 @@ echo "digests.txt published"
 echo "zeabur-${version#v}.tgz published"
 
 for platform in linux-amd64 linux-arm64 darwin-arm64; do
-  echo "zeaburctl-$version-$platform.tar.gz candidate-$platform"
+  echo "zeaburctl-$version-$platform.tar.gz zeaburctl-$platform"
 done
+echo "zeaburctl-$version-windows-amd64.zip zeaburctl-windows-amd64"
 
 for arch in amd64 arm64; do
-  echo "zeabur-$version-linux-$arch.tar.gz candidate-linux-$arch"
+  echo "zeabur-$version-linux-$arch.tar.gz zeabur-linux-$arch"
 done
 
 bun "$root/scripts/desktop-release.ts" assets "$version"

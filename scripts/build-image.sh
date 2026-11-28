@@ -2,7 +2,7 @@
 # Builds Zeabur's container image, or Zeabur Proxy's, for this machine's architecture: a static
 # musl binary in an otherwise empty image (Containerfile, Containerfile.proxy), for the development
 # cluster and its CI jobs. It compiles with the `ci` profile (Cargo.toml), which is faster than
-# `release`; scripts/release-build.sh builds the images that ship. Run on Linux inside
+# `release`; scripts/release-build-zeabur.sh builds the images that ship. Run on Linux inside
 # `nix develop`; needs docker.
 #   scripts/build-image.sh zeabur:dev
 #   scripts/build-image.sh zeabur-proxy:dev zeabur-proxy

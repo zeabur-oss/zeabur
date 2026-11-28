@@ -21,7 +21,7 @@ A maintainer releases: they run the Release pull request workflow (knope sets th
 check the draft release the workflow leaves and publish it by hand (`docs/internal/releasing.md`). A change to a `scripts/release-*.sh` is
 checked with `shellcheck`, to `scripts/*.ts` with `bun check scripts/` and `bun test scripts/`, to
 the workflow with `jactionlint` and a manual run of the Release workflow, which rehearses, and on
-Linux by running `release-build.sh` and `release-smoke.sh`; the macOS build runs on a Mac. A failed release run: `zeabur-ci`.
+Linux by running `release-build-zeabur.sh`, `release-build-zeaburctl.sh` and `release-smoke.sh`; the macOS build runs on a Mac. A failed release run: `zeabur-ci`.
 
 ## Issues
 
