@@ -1514,6 +1514,9 @@ export const zhTW: Messages = {
   "plan.expiresIn": (time: string) => `${time} 後過期`,
   "plan.expired": "已過期",
   "plan.warnings": "套用前須知",
+  "plan.kubeWarnings": "Kubernetes 的警告",
+  "plan.kubeWarning": (object: string, warning: string) =>
+    `Kubernetes 對 ${object} 提出警告：${warning}`,
   "plan.owners": "欄位擁有者",
   "plan.when": (tool) =>
     tool === "Helm"

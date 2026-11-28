@@ -1633,6 +1633,9 @@ export const en = {
   "plan.expiresIn": (time: string) => `Expires in ${time}`,
   "plan.expired": "Expired",
   "plan.warnings": "Before you apply",
+  "plan.kubeWarnings": "Warnings from Kubernetes",
+  "plan.kubeWarning": (object: string, warning: string) =>
+    `Kubernetes warns about ${object}: ${warning}`,
   "plan.owners": "Fields owned by",
   "plan.when": (tool: string) =>
     tool === "Helm"

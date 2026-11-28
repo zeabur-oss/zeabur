@@ -28,6 +28,9 @@
 //! holds the projects as the demo starts and `wiki`, deleted since. A store on 127.0.0.1 answers
 //! the `DownloadRequest`s, so restore plans list what a backup holds.
 //!
+//! `ZEABUR_DEMO_WARN=Deployment/web=<text>` makes kube-apiserver warn with each write of
+//! `Deployment/web`, so plans show the warning; `;` separates more objects.
+//!
 //! `ZEABUR_DEMO_WRONG_PORT=1` adds `lab/checkout`, a built service whose app does not listen on
 //! its port 8080 while its image declares 3000; `no-expose` makes the image declare none.
 //!
@@ -445,6 +448,23 @@ fn storefront_build() -> DynamicObject {
 /// image declare no port.
 fn wrong_port() -> Option<String> {
     std::env::var("ZEABUR_DEMO_WRONG_PORT").ok()
+}
+
+/// `ZEABUR_DEMO_WARN=Deployment/web=<text>;Namespace/shop=<text>`: the `Warning` kube-apiserver
+/// sends with each write of that object, dry runs included.
+fn write_warnings() -> BTreeMap<String, Vec<String>> {
+    let mut warnings = BTreeMap::<String, Vec<String>>::new();
+    for (object, text) in std::env::var("ZEABUR_DEMO_WARN")
+        .unwrap_or_default()
+        .split(';')
+        .filter_map(|pair| pair.split_once('='))
+    {
+        warnings
+            .entry(object.to_owned())
+            .or_default()
+            .push(text.to_owned());
+    }
+    warnings
 }
 
 /// Lab's MongoDB made with MongoDB Controllers for Kubernetes, which Zeabur does not create.
@@ -1347,6 +1367,7 @@ fn state() -> State {
         ]),
         facts,
         now: clock().as_second(),
+        write_warnings: write_warnings(),
         ..State::default()
     }
 }
