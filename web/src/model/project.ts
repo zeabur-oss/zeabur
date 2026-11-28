@@ -48,13 +48,24 @@ export function projectMention(
   return title === name ? { title } : { title, namespace: name }
 }
 
+/** Leaves out the projects whose contents kube-apiserver refused to the person. */
+export const readable = (items: readonly Schemas.ProjectSummary[]) =>
+  items.filter((p) => p.read !== "refused")
+
+/** The namespaces that are not projects, without the ones kube-apiserver refuses to adopt. */
 export function otherNamespaces(
   items: readonly Schemas.ProjectSummary[],
   showSystem: boolean,
 ): { name: string; icon?: ProjectIconName | null; adoptable: boolean }[] {
   return items
-    .filter((p) => !p.adopted && (showSystem || !p.system))
+    .filter((p) => !p.adopted && p.canAdopt !== "denied" && (showSystem || !p.system))
     .map((p) => ({ name: p.name, icon: p.icon, adoptable: !p.system }))
+}
+
+/** Every namespace that is not a project, if there is one, is refused to adopt. */
+export function mayAdoptNone(items: readonly Schemas.ProjectSummary[]) {
+  const others = items.filter((p) => !p.adopted && !p.system)
+  return others.length > 0 && others.every((p) => p.canAdopt === "denied")
 }
 
 /** `unknown` offers it: the plan's dry run decides. */
@@ -187,7 +198,10 @@ export function matchesProject(project: ProjectSummary, hosts: string[], needle:
     .includes(needle)
 }
 
-const healthOrder = (p: ProjectSummary) => (p.health ? healthRank[p.health.worst] : healthRank.ok)
+/** Its worst service's place in the health order; a project not read this time sorts with the
+ * ones that need a look. */
+export const projectRank = (p: ProjectSummary) =>
+  p.read === "failed" ? healthRank.warn : p.health ? healthRank[p.health.worst] : healthRank.ok
 const named = (p: ProjectSummary) => p.displayName ?? p.name
 
 /** Failing first, or by name; `descending` turns the order around, ties stay by name. */
@@ -199,7 +213,7 @@ export function compareProjects(
 ): number {
   const sign = descending ? -1 : 1
   if (sort === "health") {
-    return sign * (healthOrder(a) - healthOrder(b)) || named(a).localeCompare(named(b))
+    return sign * (projectRank(a) - projectRank(b)) || named(a).localeCompare(named(b))
   }
   return sign * named(a).localeCompare(named(b))
 }

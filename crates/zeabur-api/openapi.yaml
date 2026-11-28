@@ -16506,6 +16506,13 @@ components:
             description: |-
               Whether the namespace carries Zeabur's project label. Any namespace can be opened; adopting
               it only adds the label.
+          canAdopt:
+            oneOf:
+            - $ref: "#/components/schemas/Permission"
+              description: |-
+                Whether the person may adopt it, as `canAdopt` of the namespace. Only for namespaces that
+                are not projects yet, not deleted and not kept by Kubernetes.
+            - type: "null"
           deleting:
             type: boolean
             description: Its namespace is being deleted (`Terminating`).
@@ -16525,6 +16532,11 @@ components:
           origin:
             $ref: "#/components/schemas/Origin"
             description: The namespace.
+          read:
+            oneOf:
+            - $ref: "#/components/schemas/WorkloadsRead"
+              description: How reading its workloads for `health` went. Only for adopted projects.
+            - type: "null"
           services:
             type:
             - array
@@ -20886,6 +20898,13 @@ components:
               description: A CronJob's schedule; absent for other kinds.
             - type: "null"
       description: A workload as lists show it.
+    WorkloadsRead:
+      type: string
+      description: How reading an adopted project's workloads for the list went.
+      enum:
+      - read
+      - refused
+      - failed
     WriteOp:
       type: string
       description: What a write does to its object.

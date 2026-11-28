@@ -5,7 +5,7 @@ description: Send a member a setup link, so they sign in with a passkey and use 
 
 When you finish this page, your teammate is listed on **Members**, signs in to Zeabur OSS with their own passkey, and can use only the projects you gave them. A passkey lives on their phone or computer. They unlock it with a fingerprint, their face, or the screen lock, so there is no password to remember.
 
-<Figure label="A member signs in with a passkey through Zeabur Identity, and Zeabur OSS shows them only what you allowed: their projects in full, other projects by name only">
+<Figure label="A member signs in with a passkey through Zeabur Identity, and Zeabur OSS shows them only what you allowed: their projects in full, and how many others there are">
 <FigFlow>
 <FigCard title="Member" note="Passkey on their phone or computer" />
 <FigArrow label="Signs in" />
@@ -15,7 +15,7 @@ When you finish this page, your teammate is listed on **Members**, signs in to Z
 <FigArrow />
 <FigGroup label="Your cluster">
 <FigCard accent title="Projects you gave them" note="shop: Developer, blog: Viewer" />
-<FigCard title="Other projects" note="Names only" />
+<FigCard title="Other projects" note="Only how many" />
 </FigGroup>
 </FigFlow>
 </Figure>
@@ -51,7 +51,9 @@ Under **Access**, select **Chosen projects**, select the projects, and choose a 
 | **Developer** | Deploy, change variables, restart services, read logs, open terminals, and read secret values. |
 | **Viewer** | View status and events. They can't read logs, make changes, open terminals, or read secret values. |
 
-A person can have different roles in different projects. Someone with no projects selected can still sign in, but sees only nodes and project names.
+A person can have different roles in different projects. Someone with no projects selected can still sign in, but sees only nodes. Their project list leaves out the projects they can't open and says how many there are.
+
+This hides the other projects in Zeabur OSS, but their names aren't secret: `zeabur-member` lets every member list namespaces, so `kubectl get namespaces` still shows every project name.
 
 ![Invite member dialog with Chosen projects selected, blog set to Viewer, and shop set to Developer](../images/shots/members-invite.avif)
 

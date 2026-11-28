@@ -83,10 +83,15 @@ function ServicesState({ project }: { project: ProjectItem }) {
   )
 }
 
+function NotRead({ failed }: { failed: boolean }) {
+  const t = useT()
+  return <span className="text-xs text-secondary">{failed ? t("projects.notRead") : "—"}</span>
+}
+
 function ServicesHealth({ project }: { project: ProjectItem }) {
   const t = useT()
   const h = project.health
-  if (!project.services || !h) return <span className="text-xs text-secondary">—</span>
+  if (!project.services || !h) return <NotRead failed={project.read === "failed"} />
   if (h.services === 0)
     return <span className="text-xs text-secondary">{t("home.noServices")}</span>
   const dots: Health[] = []

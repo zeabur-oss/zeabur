@@ -71,6 +71,8 @@ pub struct State {
     pub hanging: BTreeSet<String>,
     /// Namespaces whose objects are refused with `403 Forbidden`.
     pub forbidden_namespaces: BTreeSet<String>,
+    /// Namespaces whose objects kube-apiserver fails to read, with `500 Internal Server Error`.
+    pub failing_namespaces: BTreeSet<String>,
     /// How many single objects were read by name.
     pub object_reads: usize,
     /// How many times a Secret's values were read.
@@ -626,6 +628,13 @@ impl MemoryCluster {
             || namespace.is_some_and(|n| state.forbidden_namespaces.contains(n))
         {
             return Err(forbidden(namespace.unwrap_or("the cluster")));
+        }
+        if namespace.is_some_and(|n| state.failing_namespaces.contains(n)) {
+            return Err(ClusterError::Status(KubernetesStatus::new(
+                500,
+                "InternalError",
+                "etcdserver: request timed out",
+            )));
         }
         Ok(state)
     }

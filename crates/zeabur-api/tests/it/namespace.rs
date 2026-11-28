@@ -507,6 +507,34 @@ mod tests {
         assert_eq!(status, StatusCode::CONFLICT, "{taken}");
     }
 
+    /// Adopting patches the namespace, so the list asks for that right on each namespace that is
+    /// not a project, not for the right to create one.
+    #[tokio::test]
+    async fn the_list_says_whether_the_person_may_adopt_each_namespace() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.cluster_wide_denied = true;
+            s.namespaces
+                .push(serde_json::from_value(json!({"metadata": {"name": "legacy"}})).unwrap());
+        });
+        let app = app(&cluster);
+        let (_, list) = send(&app, "GET", "/api/v1/projects", None).await;
+        let legacy = |list: &Value| {
+            list["items"]
+                .as_array()
+                .and_then(|items| items.iter().find(|p| p["name"] == "legacy"))
+                .map(|p| p["canAdopt"].clone())
+        };
+        assert_eq!(list["canCreate"], "denied", "{list}");
+        assert_eq!(legacy(&list), Some(json!("allowed")), "{list}");
+
+        cluster.update(|s| {
+            s.refused_rights.insert("patch namespaces".to_owned());
+        });
+        let (_, list) = send(&app, "GET", "/api/v1/projects", None).await;
+        assert_eq!(legacy(&list), Some(json!("denied")), "{list}");
+    }
+
     #[tokio::test]
     async fn without_the_right_to_create_namespaces_the_list_says_so_and_the_apply_is_refused() {
         let cluster = cluster();

@@ -32,7 +32,9 @@
 //! and failing reason, read from its workloads and pods only (six LISTs per project, at most
 //! eight projects at a time), so a navigation list or a home page can say which service fails
 //! in which project without fetching every project's document, environment variables included.
-//! Namespaces that are not adopted get neither: there may be hundreds.
+//! Namespaces that are not adopted get neither: there may be hundreds. A project whose
+//! workloads kube-apiserver refuses (`403`) is marked `read: refused`, from the same read, so
+//! the interface can leave it out; any other failure is `read: failed`, without counts.
 //!
 //! [k8s-concepts]: https://kubernetes.io/docs/reference/using-api/api-concepts/
 
@@ -73,10 +75,12 @@ use crate::error::{ApiError, list_read, project_read, read_problem};
 use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 use crate::views::{
-    ProjectDocument, ProjectExtensions, ProjectList, ProjectSummary, ServiceSummary, UnreadableView,
+    ProjectDocument, ProjectExtensions, ProjectList, ProjectSummary, ServiceSummary,
+    UnreadableView, WorkloadsRead,
 };
 
-/// How many adopted projects' workloads are read at the same time for their health.
+/// How many projects are read at the same time: adopted ones for their health, the others for
+/// whether the person may adopt them.
 const HEALTH_CONCURRENCY: usize = 8;
 
 /// The projects you may see, with the health of the adopted ones.
@@ -122,7 +126,9 @@ pub(crate) async fn list(
                 adopted,
                 health: None,
                 services: None,
+                read: None,
                 deleting,
+                can_adopt: None,
             })
         })
         .collect();
@@ -133,7 +139,7 @@ pub(crate) async fn list(
         .filter(|(_, p)| p.adopted)
         .map(|(i, p)| (i, p.name.clone()))
         .collect();
-    let healths: Vec<(usize, Option<Services>)> = futures_util::stream::iter(adopted)
+    let healths: Vec<(usize, Health)> = futures_util::stream::iter(adopted)
         .map(|(i, name)| {
             let cluster = Arc::clone(&cluster);
             async move { (i, health_of(cluster, name, now).await) }
@@ -142,12 +148,46 @@ pub(crate) async fn list(
         .collect()
         .await;
     for (i, health) in healths {
-        if let (Some(item), Some((counts, services))) = (items.get_mut(i), health) {
-            item.health = Some(counts);
-            item.services = Some(services);
+        let Some(item) = items.get_mut(i) else {
+            continue;
+        };
+        item.read = Some(match health {
+            Health::Read(counts, services) => {
+                item.health = Some(counts);
+                item.services = Some(services);
+                WorkloadsRead::Read
+            }
+            Health::Refused => WorkloadsRead::Refused,
+            Health::Failed => WorkloadsRead::Failed,
+        });
+    }
+    let guarded = state.settings.identity.project_roles;
+    let offered: Vec<(usize, String)> = items
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| !p.adopted && !p.system && !p.deleting)
+        .map(|(i, p)| (i, p.name.clone()))
+        .collect();
+    let (rights, can_create) = futures_util::join!(
+        futures_util::stream::iter(offered)
+            .map(|(i, name)| {
+                let cluster = Arc::clone(&cluster);
+                async move {
+                    (
+                        i,
+                        namespace::rights(cluster.as_ref(), &name, guarded).await.1,
+                    )
+                }
+            })
+            .buffered(HEALTH_CONCURRENCY)
+            .collect::<Vec<_>>(),
+        can_create(cluster.as_ref()),
+    );
+    for (i, can_adopt) in rights {
+        if let Some(item) = items.get_mut(i) {
+            item.can_adopt = Some(can_adopt);
         }
     }
-    let can_create = can_create(cluster.as_ref()).await;
     Ok(Json(ProjectList { items, can_create }))
 }
 
@@ -167,19 +207,30 @@ async fn can_create(cluster: &dyn Cluster) -> namespace::Permission {
     }
 }
 
-/// A project's service health counts, and each service with its health.
-type Services = (ProjectHealth, Vec<ServiceSummary>);
+/// What reading a project's workloads for the list gave.
+enum Health {
+    /// Its service health counts, and each service with its health.
+    Read(ProjectHealth, Vec<ServiceSummary>),
+    /// kube-apiserver answered `401` or `403`: the person may not read the project.
+    Refused,
+    /// Any other error, such as a timeout or a `5xx`: not read this time.
+    Failed,
+}
 
 /// The service health counts of `project` and each service's health, from its workloads and
-/// pods; `None` when they cannot be read.
-async fn health_of(cluster: Arc<dyn Cluster>, project: String, now: Timestamp) -> Option<Services> {
-    let objects = cluster.namespace_workloads(&project).await.ok()?;
+/// pods.
+async fn health_of(cluster: Arc<dyn Cluster>, project: String, now: Timestamp) -> Health {
+    let objects = match cluster.namespace_workloads(&project).await {
+        Ok(objects) => objects,
+        Err(e) if e.is_refused() => return Health::Refused,
+        Err(_) => return Health::Failed,
+    };
     let (snapshot, _) = snapshot(objects, now);
     let mut projection = zeabur_graph::project(&snapshot);
     builds::built_images(cluster.as_ref(), &project, &mut projection.services, now).await;
     let services: Vec<ServiceSummary> = projection.services.iter().map(service_summary).collect();
     let counts = ProjectHealth::count(services.iter().map(|s| s.health));
-    Some((counts, services))
+    Health::Read(counts, services)
 }
 
 /// A service as the project list shows it.

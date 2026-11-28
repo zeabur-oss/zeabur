@@ -246,6 +246,19 @@ pub struct LeaderLease {
     pub current: bool,
 }
 
+/// How reading an adopted project's workloads for the list went.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum WorkloadsRead {
+    /// Read: `health` and `services` say what is in it.
+    Read,
+    /// kube-apiserver refused it (`403`): the person may see the project's name but not what is
+    /// in it.
+    Refused,
+    /// Any other error, such as a timeout or a `5xx`: not read this time.
+    Failed,
+}
+
 /// A project in the list.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -274,9 +287,16 @@ pub struct ProjectSummary {
     /// workloads cannot be read.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub services: Option<Vec<ServiceSummary>>,
+    /// How reading its workloads for `health` went. Only for adopted projects.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub read: Option<WorkloadsRead>,
     /// Its namespace is being deleted (`Terminating`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub deleting: bool,
+    /// Whether the person may adopt it, as `canAdopt` of the namespace. Only for namespaces that
+    /// are not projects yet, not deleted and not kept by Kubernetes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub can_adopt: Option<Permission>,
 }
 
 /// One service of a project in the list: which it is, how healthy and why, without its

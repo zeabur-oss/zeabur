@@ -9940,6 +9940,17 @@ export type ProjectGitHubApp = {
 }
 
 /**
+ * How reading an adopted project's workloads for the list went.
+ */
+export type WorkloadsRead = (typeof WorkloadsRead)[keyof typeof WorkloadsRead]
+
+export const WorkloadsRead = {
+  read: "read",
+  refused: "refused",
+  failed: "failed",
+} as const
+
+/**
  * One service of a project in the list: which it is, how healthy and why, without its
  * containers, variables or configuration (those are in the project document).
  */
@@ -9981,6 +9992,7 @@ export type ProjectSummary = ProjectDetails & {
    * it only adds the label.
    */
   adopted: boolean
+  canAdopt?: Permission | null
   /** Its namespace is being deleted (`Terminating`). */
   deleting?: boolean
   health?: ProjectHealth | null
@@ -9990,6 +10002,7 @@ export type ProjectSummary = ProjectDetails & {
   name: string
   /** The namespace. */
   origin: Origin
+  read?: WorkloadsRead | null
   /**
    * Its services with their health, from the same read as `health`: sorted by kind, then
    * name, as in the project document. Only for adopted projects, and absent when their

@@ -487,8 +487,11 @@ export const zhCN: Messages = {
   "projects.namespaceOnly": "Namespace",
   "projects.other": "其他 Namespace",
   "projects.noOther": "每个 Namespace 都已是项目。",
+  "projects.hidden": (n) => `还有 ${n} 个项目你没有权限查看`,
+  "projects.notRead": "暂时读不到",
   "projects.filterOther": "筛选 Namespace",
   "projects.noOtherMatch": (query) => `没有匹配“${query}”的 Namespace。`,
+  "projects.noneDenied": "请管理员新建项目，或让你访问已有的项目。",
   "projects.noneBody":
     "项目是 Zeabur 显示的 Kubernetes Namespace。新建一个，或使用下方已有的 Namespace。",
   "projects.new": "新建项目",

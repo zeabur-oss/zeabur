@@ -17,7 +17,10 @@ import {
   mayAdopt,
   newProjectProblem,
   mayChange,
+  mayAdoptNone,
   otherNamespaces,
+  projectRank,
+  readable,
   patchRole,
   projectIcons,
   projectTitle,
@@ -59,6 +62,22 @@ describe("the list of namespaces to adopt", () => {
       ["blog", true],
       ["kube-system", false],
     ])
+  })
+
+  test("leaves out the namespaces the person may not adopt", () => {
+    const refused = [summary("shop", { adopted: true }), summary("blog", { canAdopt: "denied" })]
+    expect(otherNamespaces(refused, false)).toStrictEqual([])
+    expect(mayAdoptNone(refused)).toBe(true)
+    expect(mayAdoptNone([...refused, summary("legacy", { canAdopt: "unknown" })])).toBe(false)
+    expect(mayAdoptNone([summary("shop", { adopted: true })])).toBe(false)
+  })
+
+  test("leaves out the projects the person may not read", () => {
+    const listed = [
+      summary("shop", { adopted: true }),
+      summary("hr", { adopted: true, read: "refused" }),
+    ]
+    expect(readable(listed).map((p) => p.name)).toStrictEqual(["shop"])
   })
 
   test("names a project by its display name, else its namespace", () => {
@@ -244,5 +263,15 @@ describe("a project's build limits", () => {
     )
     expect(said.lines.join(" ")).toMatch(/build memory and CPU/)
     expect(said.action).toBe("Save build limits")
+  })
+})
+
+describe("the order of projects", () => {
+  test("puts a project not read this time with the ones that need a look", () => {
+    const project = (name: string, fields: Partial<Schemas.ProjectSummary>) =>
+      ({ name, ...fields }) as Schemas.ProjectSummary
+    const ok = project("ok", { read: "read", health: { worst: "ok" } as Schemas.ProjectHealth })
+    const failed = project("failed", { read: "failed" })
+    expect(projectRank(failed)).toBeLessThan(projectRank(ok))
   })
 })

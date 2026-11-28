@@ -33,10 +33,9 @@ import { kindName } from "@/i18n/kind-name"
 import { lastKnown, rememberKnown } from "@/lib/last-known"
 import { serviceLink } from "@/lib/place"
 import { originOf, originRank, type Origin } from "@/model/origin"
-import { otherNamespaces } from "@/model/project"
+import { mayAdoptNone, otherNamespaces, projectRank, readable } from "@/model/project"
 import {
   byHealth,
-  healthRank,
   needsAttention,
   statusOf,
   type Event,
@@ -65,13 +64,14 @@ export function HomePage() {
   const t = useT()
   const reach = useReachability()
   const projects = useQuery(projectsQuery)
-  const adopted = projects.data?.items.filter((p) => p.adopted) ?? []
+  const items = readable(projects.data?.items ?? [])
+  const adopted = items.filter((p) => p.adopted)
   const problems = useProblems(adopted)
   const shown = adopted.toSorted(byProjectHealth).slice(0, PROJECTS_SHOWN)
   useEffect(() => {
     if (projects.data)
       rememberKnown({
-        projects: projects.data.items
+        projects: readable(projects.data.items)
           .filter((p) => p.adopted)
           .toSorted(byProjectHealth)
           .slice(0, PROJECTS_SHOWN),
@@ -105,7 +105,7 @@ export function HomePage() {
         <>
           <ProblemsSection problems={problems} />
           {empty ? (
-            <Offered namespaces={otherNamespaces(projects.data?.items ?? [], false)} />
+            <Offered items={items} />
           ) : (
             <ProjectsSection
               total={adopted.length}
@@ -466,13 +466,13 @@ function Group({
 }
 
 function byProjectHealth(a: ProjectItem, b: ProjectItem): number {
-  const rank = (p: ProjectItem) => (p.health ? healthRank[p.health.worst] : healthRank.ok)
-  return rank(a) - rank(b) || a.name.localeCompare(b.name)
+  return projectRank(a) - projectRank(b) || a.name.localeCompare(b.name)
 }
 
-/** No project yet: the namespaces that could be one, each with Adopt. */
-function Offered({ namespaces }: { namespaces: ReturnType<typeof otherNamespaces> }) {
+/** No project yet: the namespaces that could be one, each with Adopt. Nothing for a person who may not create projects: adopting a namespace creates one. */
+function Offered({ items }: { items: ProjectItem[] }) {
   const t = useT()
+  if (mayAdoptNone(items)) return null
   return (
     <section aria-labelledby="home-offered" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
@@ -481,7 +481,7 @@ function Offered({ namespaces }: { namespaces: ReturnType<typeof otherNamespaces
         </h2>
         <span className="type-meta text-muted-foreground">{t("cluster.noProjectsBody")}</span>
       </div>
-      <OtherNamespaces namespaces={namespaces} limit={OFFERED} />
+      <OtherNamespaces namespaces={otherNamespaces(items, false)} limit={OFFERED} />
     </section>
   )
 }
