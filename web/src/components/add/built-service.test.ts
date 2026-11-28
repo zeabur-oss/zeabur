@@ -47,14 +47,14 @@ describe("the public domain of a Git or folder service", () => {
 })
 
 describe("the security profile of an agent build", () => {
-  const agent = (folderDockerfile: boolean) =>
+  const agent = (folderDockerfile: boolean | undefined) =>
     resolveBuilt(
       { ...newGitService(), method: "agent" },
       { ...untouched, methoded: true },
       {
         project: "shop",
         suggested: "web",
-        dockerfileFound: folderDockerfile,
+        dockerfileFound: folderDockerfile ?? false,
         folderDockerfile,
         options: { deploy: true, port: true, publicUrl: true, secrets: true, volume: true },
         suffix: undefined,
@@ -69,5 +69,9 @@ describe("the security profile of an agent build", () => {
 
   test("starts Compatible when the folder has a Dockerfile the agent builds as it is", () => {
     expect(agent(true)).toBe("baseline")
+  })
+
+  test("starts Compatible when the form cannot see the files, as for a Git repository", () => {
+    expect(agent(undefined)).toBe("baseline")
   })
 })

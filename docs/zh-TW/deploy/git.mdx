@@ -61,7 +61,7 @@ description: 連接 Git 儲存庫、完成第一次建置，並選擇新映像�
 - **環境變數**：容器執行時讀取，每行一個 `KEY=value`。
 - **建置變數**：只有建置階段使用，例如下載私有套件的權杖。值以 BuildKit secret 傳入，不會留在映像檔裡。Dockerfile 用 `RUN --mount=type=secret,id=KEY` 讀取。
 - **規格**：服務執行時的 CPU 和記憶體。
-- **安全性**：Railpack 映像檔以 UID 1000 執行，預設選**嚴格**；Dockerfile 預設選**相容**。Agent 預設選**嚴格**：模型寫的 Dockerfile 若讓映像檔以 root 執行，Zeabur Builder 不會採用；資料夾有自己的 Dockerfile 時，Agent 直接用它建置，所以預設選**相容**。建立前仍能切換。用 Dockerfile 建置並選擇嚴格時，以數字 UID 指定非 root 使用者，例如 `USER 1000`。
+- **安全性**：Railpack 映像檔以 UID 1000 執行，預設選**嚴格**；Dockerfile 預設選**相容**。Agent 預設選**相容**，因為儲存庫可能有自己的 Dockerfile，Agent 會直接用它建置。上傳的資料夾沒有 Dockerfile 時，預設選**嚴格**：模型寫的 Dockerfile 若讓映像檔以 root 執行，Zeabur Builder 不會採用。建立前仍能切換。用 Dockerfile 建置並選擇嚴格時，以數字 UID 指定非 root 使用者，例如 `USER 1000`。
 
 </Step>
 <Step>

@@ -98,9 +98,12 @@ export const newGitService = (): GitService => ({
 
 /** The profile a build's image suits: Railpack's images run as user 1000, and a Dockerfile's as
  * it says, often root. The agent builds the folder's own Dockerfile when it has one; otherwise it
- * writes one whose image runs as a numeric user other than root, as Zeabur Builder checks. */
-export const buildProfile = (method: BuildMethod, folderDockerfile: boolean): Profile =>
-  method === "railpack" || (method === "agent" && !folderDockerfile) ? "restricted" : "baseline"
+ * writes one whose image runs as a numeric user other than root, as Zeabur Builder checks. When the
+ * form cannot see the files, as for a Git repository, the agent keeps the Dockerfile profile. */
+export const buildProfile = (method: BuildMethod, folderDockerfile: boolean | undefined): Profile =>
+  method === "railpack" || (method === "agent" && folderDockerfile === false)
+    ? "restricted"
+    : "baseline"
 
 const SEGMENT = /^[A-Za-z0-9._-]+$/
 const BRANCH = new RegExp(rules["BuildSource.git.branch"].pattern)

@@ -581,6 +581,10 @@ describe("the profile of an agent build", () => {
     expect(buildProfile("agent", false)).toBe("restricted")
     expect(buildProfile("agent", true)).toBe("baseline")
   })
+
+  test("is Compatible when the files are unknown, as the repository may have a Dockerfile", () => {
+    expect(buildProfile("agent", undefined)).toBe("baseline")
+  })
 })
 
 describe("the method of a folder", () => {

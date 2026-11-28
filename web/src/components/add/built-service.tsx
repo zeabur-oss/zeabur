@@ -66,8 +66,9 @@ export function resolveBuilt<F extends BuiltForm>(
     project: string
     suggested: string
     dockerfileFound: boolean
-    /** Whether the folder has a `Dockerfile` at its root, which the agent builds as it is. */
-    folderDockerfile: boolean
+    /** Whether the folder has a `Dockerfile` at its root, which the agent builds as it is;
+     * `undefined` when the form cannot tell. */
+    folderDockerfile: boolean | undefined
     options: ReturnType<typeof imageOptions>
     suffix: string | undefined
     env: ReturnType<typeof parseEnv>
@@ -105,8 +106,8 @@ export function useBuiltForm<F extends BuiltForm>(
   project: string,
   initial: () => F,
   suggested: (form: F, taken: string[]) => string,
-  /** Whether the repository or folder has a file at a path, when the form can tell. */
-  hasFile: (path: string) => boolean = () => false,
+  /** Whether the repository or folder has a file at a path; left out when the form cannot tell. */
+  hasFile?: (path: string) => boolean,
 ) {
   const cluster = useQuery(clusterQuery).data
   const domains = cluster?.domains ?? {}
@@ -129,8 +130,8 @@ export function useBuiltForm<F extends BuiltForm>(
     setChoices((c) => ({ ...c, [choice]: true }))
     set(patch)
   }
-  const dockerfileFound = hasFile(dockerfileAt(form.directory, form.dockerfile))
-  const folderDockerfile = hasFile(dockerfileAt(form.directory, ""))
+  const dockerfileFound = hasFile?.(dockerfileAt(form.directory, form.dockerfile)) ?? false
+  const folderDockerfile = hasFile?.(dockerfileAt(form.directory, ""))
   const parsedEnv = parseEnv(env)
   const parsedBuildEnv = parseEnv(buildEnv)
   const derived = resolveBuilt(form, choices, {
