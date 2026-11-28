@@ -15,7 +15,7 @@ import { StatusPill } from "@/components/status"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"
-import { dismissInstall, installOf, installs, openPlan, startInstall } from "@/lib/installs"
+import { dismissInstall, installOf, installs, startInstall } from "@/lib/installs"
 import { useNow } from "@/lib/page-visible"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
@@ -56,10 +56,6 @@ export function ComponentPlan({
   const [action, setAction] = useState<Schemas.ComponentAction | undefined>(
     () => installOf(installs.get(), id)?.action,
   )
-  useEffect(() => {
-    openPlan.set(id)
-    return () => openPlan.set(undefined)
-  }, [id])
   const onClose = () => {
     dismissInstall(id)
     close()

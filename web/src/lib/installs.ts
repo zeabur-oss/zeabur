@@ -21,9 +21,6 @@ export interface Install {
 
 export const installs = store<Install[]>([])
 
-/** The component whose dialog is open; the indicator leaves its install to the dialog. */
-export const openPlan = store<string | undefined>(undefined)
-
 export const installOf = (list: Install[], id: string) => list.find((i) => i.id === id)
 
 const update = (id: string, change: Partial<Install>) =>

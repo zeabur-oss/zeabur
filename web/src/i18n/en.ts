@@ -2410,7 +2410,7 @@ export const en = {
   "clusterBackups.coverage.projectMethod": "Velero, to S3. Set up below.",
   "clusterBackups.coverage.installed": (name: string) => `${name} installed`,
   "clusterBackups.coverage.install": (name: string) => `Install ${name}`,
-  "clusterBackups.coverage.unfinished": (name: string) => `${name}: install not finished`,
+  "clusterBackups.coverage.unfinished": (name: string) => `${name}: installation incomplete`,
   "clusterBackups.notInstalled": "Backups need Velero",
   "clusterBackups.notInstalledBody":
     "Velero copies the cluster's objects and the files in its volumes to S3-compatible storage on a schedule. Install it from Components, then come back here to set it up.",
