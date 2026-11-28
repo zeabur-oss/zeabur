@@ -194,6 +194,11 @@ fn built_wrong(error: &kube::core::request::Error) -> ClusterError {
 /// Sends `request` and returns the body of the answer and the text of its `Warning` headers.
 /// kube's typed calls (`Api::patch`, `Client::request`) read only the body, so the request goes
 /// through `Client::send`, and an error status becomes the error kube would give.
+///
+/// This is a workaround. When kube-client gives callers the `Warning` headers of an answer
+/// ([kube-rs/kube#2094]), use the typed calls again and remove this function.
+///
+/// [kube-rs/kube#2094]: https://github.com/kube-rs/kube/issues/2094
 async fn send(
     client: &kube::Client,
     request: http::Request<Vec<u8>>,
