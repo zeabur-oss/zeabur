@@ -135,7 +135,11 @@ function UsageWarnings({
   const lines = [
     found.nearLimit && t("form.nearLimit", show(found.used), show(found.nearLimit.limit)),
     found.aboveRequest &&
-      t("form.aboveRequest", show(found.used), show(found.aboveRequest.request)),
+      t(
+        cpu ? "form.aboveRequestCpu" : "form.aboveRequestMemory",
+        show(found.used),
+        show(found.aboveRequest.request),
+      ),
   ]
   return (
     <div className="flex flex-col gap-2 sm:col-span-2">
