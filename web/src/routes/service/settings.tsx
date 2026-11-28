@@ -2,7 +2,7 @@ import { useForm, useSelector } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 
 import type { Schemas } from "@/api/client"
-import { nodesQuery, releasesQuery } from "@/api/queries"
+import { nodesQuery, releasesQuery, usageQuery } from "@/api/queries"
 import { Hint } from "@/components/bits"
 import { GateNote, useGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
@@ -15,6 +15,8 @@ import { serviceSettingsSections } from "@/modules/service-settings"
 import { refusedField } from "@/model/problem"
 import { endpointsOf, type Endpoint, type Network, type Service } from "@/model/service"
 import { AmountInput } from "@/components/amount-input"
+import { busiest, rowWarnings } from "@/model/usage-warning"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { FormField } from "@/components/form-field"
 import { aboveLimit, isAmount, type Dimension } from "@/lib/amount"
 import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
@@ -44,6 +46,7 @@ export function ComputeSection({ project, service }: { project: string; service:
         <p className="text-sm text-muted-foreground">{t("form.jobs")}</p>
       ) : (
         <Compute
+          project={project}
           service={service}
           disabled={!!managed || !gate.open}
           workload={{ kind: service.kind, name: service.name }}
@@ -107,17 +110,52 @@ const paths: Record<keyof Amounts, string> = {
   memoryLimit: "limits.memory",
 }
 
-function Compute({
-  service,
-  workload,
-  disabled,
-  refused,
+/** Each container's usage in its busiest replica, while metrics are available. */
+function useBusiest(project: string, service: Service) {
+  const usage = useQuery(usageQuery(project))
+  return busiest(service, usage.data?.state === "available" ? usage.data : undefined)
+}
+
+/** Under the CPU or the memory row: what the busiest replica's usage says about what is typed. */
+function UsageWarnings({
+  row,
+  amounts,
+  sample,
 }: {
-  service: Service
-  workload: Schemas.WorkloadRef
-  disabled: boolean
-  refused: Schemas.FieldCause[]
+  row: "cpuRequest" | "memoryRequest"
+  amounts: Amounts | undefined
+  sample: { cpu: number; memory: number } | undefined
 }) {
+  const t = useT()
+  const { millicores, memory } = useQuantityFormat()
+  const cpu = row === "cpuRequest"
+  const found = rowWarnings(cpu ? "cpu" : "bytes", amounts, sample)
+  if (!found) return null
+  const show = cpu ? (cores: number) => millicores(cores * 1000) : memory
+  const lines = [
+    found.nearLimit && t("form.nearLimit", show(found.used), show(found.nearLimit.limit)),
+    found.aboveRequest &&
+      t(
+        cpu ? "form.aboveRequestCpu" : "form.aboveRequestMemory",
+        show(found.used),
+        show(found.aboveRequest.request),
+      ),
+  ]
+  return (
+    <div className="flex flex-col gap-2 sm:col-span-2">
+      {lines.map((line) =>
+        line ? (
+          <Alert key={line} variant="warn" role="note">
+            <AlertDescription>{line}</AlertDescription>
+          </Alert>
+        ) : null,
+      )}
+    </div>
+  )
+}
+
+/** The size of the biggest node, as a line under the form. */
+function LargestNode() {
   const t = useT()
   const { cores, memory } = useQuantityFormat()
   const nodes = useQuery(nodesQuery)
@@ -126,6 +164,29 @@ function Compute({
       !best || node.allocatable.memoryBytes > best.memoryBytes ? node.allocatable : best,
     undefined,
   )
+  if (!largest) return null
+  return (
+    <p className="type-meta text-muted-foreground">
+      {t("form.largestNode", cores(largest.cpuMillicores), memory(largest.memoryBytes))}
+    </p>
+  )
+}
+
+function Compute({
+  project,
+  service,
+  workload,
+  disabled,
+  refused,
+}: {
+  project: string
+  service: Service
+  workload: Schemas.WorkloadRef
+  disabled: boolean
+  refused: Schemas.FieldCause[]
+}) {
+  const t = useT()
+  const used = useBusiest(project, service)
   const scalable = service.kind === "Deployment" || service.kind === "StatefulSet"
   const containers = service.containers.filter((c) => !c.init)
   const initial = {
@@ -284,15 +345,16 @@ function Compute({
                   </form.Field>
                 )
               })}
+              <UsageWarnings
+                row={row[0][0]}
+                amounts={values.containers[index]}
+                sample={used.get(container.name)}
+              />
             </div>
           ))}
         </fieldset>
       ))}
-      {largest ? (
-        <p className="type-meta text-muted-foreground">
-          {t("form.largestNode", cores(largest.cpuMillicores), memory(largest.memoryBytes))}
-        </p>
-      ) : null}
+      <LargestNode />
     </form>
   )
 }

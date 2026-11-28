@@ -2073,6 +2073,12 @@ export const en = {
   "form.computeHint":
     "The node sets the reserved amount aside for each replica. When a replica uses more memory than its maximum, its container restarts; CPU above the maximum is slowed down.",
   "form.largestNode": (cores: string, memory: string) => `Largest node: ${cores} cores, ${memory}`,
+  "form.nearLimit": (used: string, limit: string) =>
+    `The busiest replica uses ${used} of the ${limit} maximum. The container is restarted if it goes over.`,
+  "form.aboveRequestCpu": (used: string, request: string) =>
+    `The busiest replica uses ${used}, more than the ${request} reserved. It may get less CPU when the node is busy.`,
+  "form.aboveRequestMemory": (used: string, request: string) =>
+    `The busiest replica uses ${used}, more than the ${request} reserved. When the node runs low on memory, it is among the first to be stopped.`,
   "form.badQuantity": "Enter an amount such as 0.25 cores or 512 MiB.",
   "form.badReplicas": "Enter a whole number from 0 to 1000.",
   "form.badNumber": "Enter a whole number above 0.",
