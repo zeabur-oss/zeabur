@@ -36,6 +36,8 @@
 //!
 //! K8up backs up shop's Redis volume nightly to R2; the newest run failed. `ZEABUR_DEMO_K8UP=none`
 //! leaves it uninstalled. The cluster lists one S3 destination, `r2-backups`.
+//! lab's object store `files` answers through an in-memory S3 gateway, so its Files tab browses
+//! and changes bucket `uploads` (uploads in parts are not played).
 //!
 //! Alerting sends shop's deploy failures to Slack and the cluster's node alerts to Telegram; a
 //! second shop channel was rejected by Alertmanager. `ZEABUR_DEMO_ALERTING=none` leaves it
@@ -3385,6 +3387,7 @@ fn github_app(s: &mut State, fake: &FakeGitHub) {
 )]
 async fn main() -> std::io::Result<()> {
     let mut state = state();
+    object_storage_keys(&mut state);
     if std::env::var_os("ZEABUR_DEMO_DELETING").is_some() {
         deleting(&mut state);
     }
@@ -3491,6 +3494,7 @@ async fn main() -> std::io::Result<()> {
         images: Some(Arc::new(images)),
         template_idle,
         terminals,
+        s3_endpoint: Some(fake_s3().await?),
         ..zeabur_api::Options::default()
     };
     let app = zeabur_api::router_with(Arc::new(access), options).fallback_service(
@@ -3505,6 +3509,212 @@ async fn main() -> std::io::Result<()> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     println!("listening on http://{}", listener.local_addr()?);
     axum::serve(listener, app).await
+}
+
+/// The keys of lab's `files` store, which Zeabur reads to reach the gateway [`fake_s3`] plays.
+fn object_storage_keys(s: &mut State) {
+    s.secret_values.insert(
+        "lab/files-app".to_owned(),
+        BTreeMap::from([
+            ("accessKey".to_owned(), b"ZK4Q8N2M7RXW".to_vec()),
+            ("secretKey".to_owned(), b"demo-only-secret-key".to_vec()),
+        ]),
+    );
+}
+
+/// A 1×1 PNG, for the avatars a bucket holds.
+const PIXEL: &[u8] = &[
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+    0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x60, 0x68, 0xD8, 0xF0,
+    0x1F, 0x00, 0x05, 0x01, 0x02, 0x80, 0x4F, 0x9C, 0x9C, 0x2B, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+    0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+];
+
+/// Plays the S3 gateway of lab's `files` store for bucket `uploads`, in memory: listings by
+/// folder, reads, writes, copies and deletes. It takes any signature; uploads in parts are not
+/// played.
+async fn fake_s3() -> std::io::Result<String> {
+    use std::fmt::Write as _;
+    use std::sync::{Mutex, PoisonError};
+
+    use axum::body::Bytes;
+    use axum::extract::{Path, RawQuery, State as Shared};
+    use axum::http::{HeaderMap, Method, StatusCode};
+    use axum::response::{IntoResponse as _, Response};
+
+    type Objects = Arc<Mutex<BTreeMap<String, (Vec<u8>, &'static str, &'static str)>>>;
+
+    fn escape(text: &str) -> String {
+        text.replace('&', "&amp;").replace('<', "&lt;")
+    }
+
+    fn list(
+        objects: &BTreeMap<String, (Vec<u8>, &str, &str)>,
+        query: &BTreeMap<String, String>,
+    ) -> String {
+        let prefix = query.get("prefix").cloned().unwrap_or_default();
+        let grouped = query.contains_key("delimiter");
+        let mut contents = String::new();
+        let mut folders = std::collections::BTreeSet::new();
+        for (key, (bytes, _, modified)) in objects.range(prefix.clone()..) {
+            let Some(rest) = key.strip_prefix(&prefix) else {
+                break;
+            };
+            match rest.split_once('/').filter(|_| grouped) {
+                Some((folder, _)) => {
+                    folders.insert(format!("{prefix}{folder}/"));
+                }
+                None => {
+                    let _ignored = write!(
+                        contents,
+                        "<Contents><Key>{}</Key><Size>{}</Size><LastModified>{modified}</LastModified></Contents>",
+                        escape(key),
+                        bytes.len()
+                    );
+                }
+            }
+        }
+        for folder in folders {
+            let _ignored = write!(
+                contents,
+                "<CommonPrefixes><Prefix>{}</Prefix></CommonPrefixes>",
+                escape(&folder)
+            );
+        }
+        format!("<ListBucketResult>{contents}<IsTruncated>false</IsTruncated></ListBucketResult>")
+    }
+
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "the gateway holds its objects for the whole request"
+    )]
+    async fn gateway(
+        Shared(held): Shared<Objects>,
+        method: Method,
+        Path(path): Path<String>,
+        RawQuery(raw): RawQuery,
+        headers: HeaderMap,
+        body: Bytes,
+    ) -> Response {
+        let query: BTreeMap<String, String> =
+            form_urlencoded::parse(raw.unwrap_or_default().as_bytes())
+                .map(|(k, v)| (k.into_owned(), v.into_owned()))
+                .collect();
+        let key = path.split_once('/').map_or("", |(_, key)| key).to_owned();
+        let mut objects = held.lock().unwrap_or_else(PoisonError::into_inner);
+        let missing = || {
+            (
+                StatusCode::NOT_FOUND,
+                "<Error><Code>NoSuchKey</Code></Error>",
+            )
+                .into_response()
+        };
+        match (method, key.as_str()) {
+            (Method::GET, "") => list(&objects, &query).into_response(),
+            (Method::POST, "") => {
+                let text = String::from_utf8_lossy(&body);
+                for part in text.split("<Key>").skip(1) {
+                    if let Some((key, _)) = part.split_once("</Key>") {
+                        objects.remove(&key.replace("&lt;", "<").replace("&amp;", "&"));
+                    }
+                }
+                "<DeleteResult></DeleteResult>".into_response()
+            }
+            (Method::PUT, _) => {
+                let copied = headers
+                    .get("x-amz-copy-source")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|source| {
+                        form_urlencoded::parse(
+                            format!("k={}", source.trim_start_matches("/uploads/")).as_bytes(),
+                        )
+                        .map(|(_, v)| v.into_owned())
+                        .collect::<String>()
+                    });
+                let object = match copied {
+                    Some(source) => match objects.get(&source) {
+                        Some(object) => object.clone(),
+                        None => return missing(),
+                    },
+                    None => (
+                        body.to_vec(),
+                        "binary/octet-stream",
+                        "2026-10-26T09:00:00.000Z",
+                    ),
+                };
+                objects.insert(key, object);
+                ([("etag", "\"demo\"")], "<CopyObjectResult/>").into_response()
+            }
+            (Method::GET | Method::HEAD, _) => match objects.get(&key) {
+                Some((bytes, kind, _)) => {
+                    ([("content-type", *kind)], bytes.clone()).into_response()
+                }
+                None => missing(),
+            },
+            (Method::DELETE, _) => {
+                objects.remove(&key);
+                StatusCode::NO_CONTENT.into_response()
+            }
+            _ => StatusCode::NOT_IMPLEMENTED.into_response(),
+        }
+    }
+
+    let readme = b"# uploads\n\nFiles the storefront keeps: avatars people upload, monthly order exports\nand invoices. The storefront writes them; nothing here is edited by hand.\n";
+    let orders = b"order,placed,total\n10421,2026-10-01,42.50\n10422,2026-10-01,18.00\n10423,2026-10-02,96.20\n";
+    let held: Objects = Arc::new(Mutex::new(BTreeMap::from([
+        (
+            "README.md".to_owned(),
+            (readme.to_vec(), "text/markdown", "2026-09-14T08:12:00.000Z"),
+        ),
+        (
+            "avatars/".to_owned(),
+            (
+                Vec::new(),
+                "binary/octet-stream",
+                "2026-09-14T08:12:00.000Z",
+            ),
+        ),
+        (
+            "avatars/ana.png".to_owned(),
+            (PIXEL.to_vec(), "image/png", "2026-10-20T16:40:00.000Z"),
+        ),
+        (
+            "avatars/ben.png".to_owned(),
+            (PIXEL.to_vec(), "image/png", "2026-10-22T11:05:00.000Z"),
+        ),
+        (
+            "exports/orders-2026-09.csv".to_owned(),
+            (orders.repeat(40), "text/csv", "2026-10-01T00:05:00.000Z"),
+        ),
+        (
+            "exports/orders-2026-10.csv".to_owned(),
+            (orders.to_vec(), "text/csv", "2026-10-26T00:05:00.000Z"),
+        ),
+        (
+            "invoices/2026/INV-1042.pdf".to_owned(),
+            (
+                [0x25, 0x50, 0x44, 0x46, 0xFF, 0x00].repeat(9000),
+                "application/pdf",
+                "2026-10-03T10:00:00.000Z",
+            ),
+        ),
+        (
+            "robots.txt".to_owned(),
+            (
+                b"User-agent: *\nDisallow: /\n".to_vec(),
+                "text/plain",
+                "2026-09-14T08:12:00.000Z",
+            ),
+        ),
+    ])));
+    let router = axum::Router::new()
+        .route("/{*path}", axum::routing::any(gateway))
+        .with_state(held);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    let url = format!("http://{}", listener.local_addr()?);
+    tokio::spawn(async move { axum::serve(listener, router).await });
+    Ok(url)
 }
 
 #[cfg(test)]

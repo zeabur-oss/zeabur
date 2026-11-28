@@ -84,7 +84,7 @@ import {
 //   /projects/$project/databases/$engine/$name one database an operator runs: ?tab=logs|backups|
 //                                              events|settings (Overview when absent), and
 //                                              Settings' YAML view (?mode=yaml)
-//   /projects/$project/object-storage/$name    one object store: ?tab=logs|events|settings
+//   /projects/$project/object-storage/$name    one object store: ?tab=files|logs|events|settings, Files with ?bucket= and ?prefix=
 //   /settings                                  preferences, the signed-in person, About
 //   /account                                   your account: who you are, your role in each
 //                                              project, a link to manage how you sign in

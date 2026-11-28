@@ -11,6 +11,8 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+# HMAC-SHA256 for the signatures of S3 requests, and a fake GitHub App key in its tests.
+aws-lc-rs.workspace = true
 zeabur-core.workspace = true
 zeabur-gaps.workspace = true
 zeabur-http.workspace = true
@@ -60,8 +62,6 @@ name = "demo"
 test = true
 
 [dev-dependencies]
-# A fake GitHub's App key in the GitHub App tests.
-aws-lc-rs.workspace = true
 zeabur-kube = { workspace = true, features = ["memory"] }
 zeabur-test-support = { workspace = true, features = ["sandbox", "tls"] }
 zeabur-ui = { workspace = true, features = ["interface"] }

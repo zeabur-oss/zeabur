@@ -86,7 +86,7 @@ These keys can read and write every bucket in this object storage. `S3_BUCKET` o
 
 To add a bucket, click **New bucket** under **Buckets** in **Overview**, enter a name, then **Review changes** and apply. Wait for the row to show `Ready` before using it in an application.
 
-The bucket list shows storage usage and object counts. It shows **Not counted yet** when statistics aren't available. Use an S3 client to upload, download, and browse files. This page only manages buckets.
+The bucket list shows storage usage and object counts. It shows **Not counted yet** when statistics aren't available. To see and change the files in a bucket, see [Browse and change files](#browse-and-change-files).
 
 To delete a bucket, click the delete button in its row, read the confirmation, and apply. Buckets created by Zeabur OSS use the `Delete` reclaim policy, so deleting them also deletes their files. If an existing bucket uses a retain policy, the confirmation states that its files will remain in the storage service.
 
@@ -94,9 +94,20 @@ To delete a bucket, click the delete button in its row, read the confirmation, a
 Deleting a bucket with the `Delete` policy deletes its files. First, use an S3 client that can reach the endpoint to copy anything you want to keep. Confirm that you can read the copy at the destination before deleting the source.
 </Callout>
 
+## Browse and change files
+
+Open the object storage's **Files** tab, or click the folder button in a bucket's row under **Buckets**. With more than one bucket, choose one at the top. Zeabur OSS reads and writes the files through the storage's S3 gateway with the storage's keys. The keys stay on the server.
+
+- Click a folder to open it, and the path above the list to go back. Click a file to preview it: text up to 1 MB, and PNG, JPEG, GIF, WebP and AVIF images. Other files say to download them.
+- **Upload** sends files to the open folder. A file with the same name is replaced. Files larger than 16 MiB are sent in parts.
+- **New folder** makes an empty folder. **Rename** in a file's menu copies it to the new name in the same folder, then deletes the old one. A name that another file has is refused.
+- **Delete** in a folder's menu first counts the files in it, then deletes all of them.
+
+Browsing needs permission to read secrets, because the keys are in a secret. Changing files also needs permission to change the bucket. Without one of them, the tab says which permission is missing.
+
 ## Keep files and change settings
 
-The object storage page has **Overview**, **Logs**, **Events**, and **Settings** tabs. To expand the space for file data, enter a larger value, such as `20Gi`, under **Settings** → **Storage**. Click **Review changes**, confirm the changes, then click **Expand to 20Gi**. The operator expands the disk directly and keeps all files. Capacity can only increase. The text below the field states whether the current storage class supports expansion.
+The object storage page has **Overview**, **Files**, **Logs**, **Events**, and **Settings** tabs. To expand the space for file data, enter a larger value, such as `20Gi`, under **Settings** → **Storage**. Click **Review changes**, confirm the changes, then click **Expand to 20Gi**. The operator expands the disk directly and keeps all files. Capacity can only increase. The text below the field states whether the current storage class supports expansion.
 
 For other operator settings, switch to **YAML** at the top of **Settings**, make your changes, then review and apply them.
 

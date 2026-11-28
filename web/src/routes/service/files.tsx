@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { lazy, Suspense, useDeferredValue, useRef, useState, type ReactNode } from "react"
+import { lazy, Suspense, useDeferredValue, useState, type ReactNode } from "react"
 import ArrowUpIcon from "~icons/ph/arrow-up"
 import CaretRightIcon from "~icons/ph/caret-right"
 import ClockCountdownIcon from "~icons/ph/clock-countdown"
@@ -9,29 +9,36 @@ import DownloadSimpleIcon from "~icons/ph/download-simple"
 import EyeIcon from "~icons/ph/eye"
 import FileIcon from "~icons/ph/file"
 import FolderIcon from "~icons/ph/folder"
-import FolderPlusIcon from "~icons/ph/folder-plus"
 import GearIcon from "~icons/ph/gear"
 import HardDrivesIcon from "~icons/ph/hard-drives"
 import LinkSimpleIcon from "~icons/ph/link-simple"
 import LockSimpleIcon from "~icons/ph/lock-simple"
 import PencilSimpleIcon from "~icons/ph/pencil-simple"
 import TrashIcon from "~icons/ph/trash"
-import UploadSimpleIcon from "~icons/ph/upload-simple"
 import WarningFillIcon from "~icons/ph/warning-fill"
-import XIcon from "~icons/ph/x"
 
-import {
-  ApiError,
-  localProblem,
-  toProblem,
-  type Problem as ProblemBody,
-  type Schemas,
-} from "@/api/client"
+import { toProblem, type Problem as ProblemBody, type Schemas } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
 import { filesQuery, listQuery, previewQuery, refreshFiles, type Place } from "@/api/files"
 import { debugQuery, whoamiQuery } from "@/api/queries"
-import { REQUEST_HEADERS } from "@/auth/session"
 import { Ago, Hint } from "@/components/bits"
+import {
+  cell,
+  ChosenFiles,
+  Confirm,
+  DialogBar,
+  EntryTableHead,
+  FileTableHead,
+  opener,
+  putBytes,
+  row,
+  sendAll,
+  UploadProgress,
+  useSize,
+  useWrite,
+  WriteActions,
+  type Upload,
+} from "@/components/file-manager"
 import { FilterField } from "@/components/filter-field"
 import { FormField } from "@/components/form-field"
 import { LoadingRows } from "@/components/page"
@@ -43,18 +50,12 @@ import { YamlBlock } from "@/components/yaml"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Card } from "@zeabur-oss/design-system/components/card"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogTitle,
-} from "@zeabur-oss/design-system/components/dialog"
+import { Dialog, DialogContent } from "@zeabur-oss/design-system/components/dialog"
 import { Input } from "@zeabur-oss/design-system/components/input"
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur-oss/design-system/components/menu"
 import { Select } from "@zeabur-oss/design-system/components/select"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
-import { useI18n, useT, type Translate } from "@/i18n"
-import { formatSize } from "@/lib/format"
+import { useT, type Translate } from "@/i18n"
 import { cn } from "@/lib/utils"
 import type { Service } from "@/model/service"
 import { execRole } from "@/model/terminal"
@@ -95,11 +96,6 @@ const holdsMount = (mounts: Mount[], path: string) =>
   path === "/" || mounts.some((m) => m.path !== "/" && within(m.path, path))
 
 const kernel = ["/proc", "/sys", "/dev"]
-
-function useSize() {
-  const { locale } = useI18n()
-  return (bytes: number) => formatSize(bytes, locale)
-}
 
 const isoOf = (seconds: number) => new Date(seconds * 1000).toISOString()
 
@@ -287,29 +283,13 @@ function keeps(t: Translate, mount: Mount): string | undefined {
   return undefined
 }
 
-const head = "px-3 py-2 text-left type-meta font-medium text-muted-foreground whitespace-nowrap"
-const cell = "px-3 py-2 align-middle max-sm:p-0"
-const thead = "border-b bg-muted/30 max-sm:hidden"
-const row =
-  "max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-1 max-sm:px-4 max-sm:py-3"
-const opener =
-  "flex max-w-full min-w-0 items-center gap-2 rounded-sm text-left hover:underline disabled:no-underline"
-
 /** The first level: the volumes, then the image's own files. */
 function MountTable({ files, onOpen }: { files: Files; onOpen?: (path: string) => void }) {
   const t = useT()
   const viaDebug = files.reader.kind === "debugContainer"
   return (
     <table className="w-full text-sm max-sm:block" aria-label={t("files.volumes")}>
-      <thead className={thead}>
-        <tr>
-          <th className={`${head} sm:w-1/2 sm:pl-4`}>{t("files.path")}</th>
-          <th className={head}>{t("files.what")}</th>
-          <th className={`${head} sm:pr-4 text-right`}>
-            <span className="sr-only">{t("files.keeps")}</span>
-          </th>
-        </tr>
-      </thead>
+      <FileTableHead />
       <tbody className="divide-y max-sm:block">
         {files.mounts.map((mount) => {
           const Icon = kindIcon[mount.kind]
@@ -556,7 +536,6 @@ function Folder({
     placeholderData: (previous) => previous,
   })
   const mount = mountOf(files.mounts, path)
-  const picker = useRef<HTMLInputElement>(null)
   const writable = mount !== undefined && !mount.readOnly
   const role = useGateReason()(useHereGate("openTerminal"))
   const why = writable ? role : t("files.readOnly")
@@ -567,29 +546,10 @@ function Folder({
   const capped = Boolean(list.data && (list.data.more || items.length < total))
   const actions = (
     <>
-      <WriteButton
+      <WriteActions
         why={why}
-        label={t("files.newFolder")}
-        icon={<FolderPlusIcon />}
-        onClick={() => onDialog({ kind: "folder" })}
-      />
-      <WriteButton
-        why={why}
-        label={t("files.upload")}
-        icon={<UploadSimpleIcon />}
-        primary
-        onClick={() => picker.current?.click()}
-      />
-      <input
-        ref={picker}
-        type="file"
-        multiple
-        hidden
-        onChange={(event) => {
-          const chosen = [...(event.target.files ?? [])]
-          event.target.value = ""
-          if (chosen.length > 0) onDialog({ kind: "upload", files: chosen })
-        }}
+        onFolder={() => onDialog({ kind: "folder" })}
+        onFiles={(files) => onDialog({ kind: "upload", files })}
       />
     </>
   )
@@ -653,41 +613,6 @@ function FolderProblem({ error, project }: { error: unknown; project: string }) 
   const problem = toProblem(error)
   if (isRefusal(problem)) return <RefusedFiles project={project} problem={problem} />
   return <Problem problem={problem} />
-}
-
-function WriteButton({
-  why,
-  label,
-  icon,
-  primary,
-  onClick,
-}: {
-  why?: string
-  label: string
-  icon: ReactNode
-  primary?: boolean
-  onClick: () => void
-}) {
-  const button = (
-    <Button
-      variant={primary ? "default" : "outline"}
-      size="sm"
-      disabled={Boolean(why)}
-      onClick={onClick}
-    >
-      <span aria-hidden="true" data-icon="inline-start" className="contents">
-        {icon}
-      </span>
-      {label}
-    </Button>
-  )
-  return why ? (
-    <Tooltip content={why}>
-      <span className="inline-flex">{button}</span>
-    </Tooltip>
-  ) : (
-    button
-  )
 }
 
 /** One line under the path where the volume changes what the tab may do. */
@@ -774,16 +699,7 @@ function EntryTable({
     return <p className="px-4 py-6 text-sm text-muted-foreground">{t("files.empty")}</p>
   return (
     <table className="w-full text-sm max-sm:block sm:table-fixed" aria-label={path}>
-      <thead className={thead}>
-        <tr>
-          <th className={`${head} sm:pl-4`}>{t("files.name")}</th>
-          <th className={`${head} w-28 text-right`}>{t("files.size")}</th>
-          <th className={`${head} w-36`}>{t("files.modified")}</th>
-          <th className={`${head} w-14 sm:pr-4`}>
-            <span className="sr-only">{t("files.actions")}</span>
-          </th>
-        </tr>
-      </thead>
+      <EntryTableHead />
       <tbody className="divide-y max-sm:block">
         {entries.map((entry) => {
           const full = join(path, entry.name)
@@ -902,31 +818,6 @@ function RowMenu({
   )
 }
 
-function DialogBar({ title, mono }: { title: ReactNode; mono?: boolean }) {
-  const t = useT()
-  return (
-    <div className="flex items-center gap-2 border-b px-6 py-3">
-      <div className="min-w-0 flex-1 truncate">
-        <DialogTitle>
-          <span
-            className={cn("block truncate", mono && "font-mono")}
-            translate={mono ? "no" : undefined}
-          >
-            {title}
-          </span>
-        </DialogTitle>
-      </div>
-      <DialogClose
-        render={
-          <Button variant="ghost" size="icon-sm" className="-mr-1" aria-label={t("common.close")} />
-        }
-      >
-        <XIcon aria-hidden="true" />
-      </DialogClose>
-    </div>
-  )
-}
-
 /** A text file's first megabyte in a panel; anything else says to download it. */
 function Preview({ place, path, onClose }: { place: Place; path: string; onClose: () => void }) {
   const t = useT()
@@ -977,81 +868,9 @@ function Preview({ place, path, onClose }: { place: Place; path: string; onClose
   )
 }
 
-/** A confirmation: what happens, the warning that goes with the mount, and the button that does it. */
-function Confirm({
-  title,
-  children,
-  action,
-  destructive,
-  busy,
-  problem,
-  onConfirm,
-  onClose,
-}: {
-  title: ReactNode
-  children: ReactNode
-  action: string
-  destructive?: boolean
-  busy: boolean
-  problem?: ProblemBody
-  onConfirm: () => void
-  onClose: () => void
-}) {
-  const t = useT()
-  return (
-    <Dialog open onOpenChange={(open) => (open || busy ? undefined : onClose())}>
-      <DialogContent variant="compact">
-        <form
-          className="flex min-h-0 flex-1 flex-col"
-          onSubmit={(event) => {
-            event.preventDefault()
-            onConfirm()
-          }}
-        >
-          <DialogBar title={title} />
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 py-4 text-sm">
-            {children}
-            {problem ? <Problem problem={problem} /> : null}
-          </div>
-          <div className="flex items-center justify-end gap-2 border-t px-6 py-3">
-            <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={busy}>
-              {t("plan.cancel")}
-            </Button>
-            <Button
-              type="submit"
-              variant={destructive ? "destructive" : "default"}
-              size="sm"
-              disabled={busy}
-            >
-              {action}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-/** Runs a write once; keeps its problem for the dialog to show. */
-function useWrite(place: Place, onDone: () => void) {
-  const refresh = () => refreshFiles(place.project, place.pod)
-  const [busy, setBusy] = useState(false)
-  const [problem, setProblem] = useState<ProblemBody>()
-  const run = async (write: () => Promise<unknown>) => {
-    setBusy(true)
-    setProblem(undefined)
-    try {
-      await write()
-      await refresh()
-      onDone()
-    } catch (error) {
-      setProblem(toProblem(error))
-    } finally {
-      setBusy(false)
-    }
-  }
-  return { busy, problem, run }
-}
+/** Runs a write once, then reads the pod's files again. */
+const usePodWrite = (place: Place, onDone: () => void) =>
+  useWrite(() => refreshFiles(place.project, place.pod), onDone)
 
 function LostWarning({ mount }: { mount?: Mount }) {
   const t = useT()
@@ -1082,7 +901,7 @@ function FolderDialog({
 }) {
   const t = useT()
   const [name, setName] = useState("")
-  const { busy, problem, run } = useWrite(place, onClose)
+  const { busy, problem, run } = usePodWrite(place, onClose)
   const valid = validName(name)
   return (
     <Confirm
@@ -1133,7 +952,7 @@ function RenameDialog({
   const t = useT()
   const old = nameOf(path)
   const [name, setName] = useState(old)
-  const { busy, problem, run } = useWrite(place, onClose)
+  const { busy, problem, run } = usePodWrite(place, onClose)
   const valid = validName(name) && name !== old
   return (
     <Confirm
@@ -1188,7 +1007,7 @@ function DeleteDialog({
   const t = useT()
   const size = useSize()
   const mount = mountOf(files.mounts, path)
-  const { busy, problem, run } = useWrite(place, onClose)
+  const { busy, problem, run } = usePodWrite(place, onClose)
   const directory = entry.type === "directory"
   const what = directory
     ? t("files.deleteFolder", entry.name)
@@ -1235,49 +1054,23 @@ function DeleteDialog({
   )
 }
 
-interface Upload {
-  name: string
-  size: number
-  done: number
-  state: "waiting" | "sending" | "done" | "failed"
-  problem?: ProblemBody
-}
-
-/** One file, as raw bytes; the browser sets `Content-Length`. */
-function send(
+/** One file, as raw bytes. */
+const send = (
   place: Place,
   path: string,
   file: File,
   replace: boolean,
   onProgress: (done: number) => void,
-) {
-  return new Promise<void>((resolve, reject) => {
-    const request = new XMLHttpRequest()
-    request.open(
-      "PUT",
-      zeabur.getUploadFileUrl(place.project, place.pod, {
-        ...reader(place),
-        path,
-        ...(replace ? { replace } : {}),
-      }),
-    )
-    for (const [name, value] of Object.entries(REQUEST_HEADERS))
-      request.setRequestHeader(name, value)
-    request.upload.onprogress = (event) => onProgress(event.loaded)
-    request.onload = () => {
-      if (request.status >= 200 && request.status < 300) return resolve()
-      let problem: ProblemBody
-      try {
-        problem = JSON.parse(request.responseText) as ProblemBody
-      } catch {
-        problem = localProblem(request.status, `The server answered ${request.status}.`)
-      }
-      reject(new ApiError(request.status, problem))
-    }
-    request.onerror = () => reject(new ApiError(0, localProblem(0, "The upload was cut off.")))
-    request.send(file)
-  })
-}
+) =>
+  putBytes(
+    zeabur.getUploadFileUrl(place.project, place.pod, {
+      ...reader(place),
+      path,
+      ...(replace ? { replace } : {}),
+    }),
+    file,
+    onProgress,
+  )
 
 function UploadDialog({
   place,
@@ -1299,32 +1092,15 @@ function UploadDialog({
   const refresh = () => refreshFiles(place.project, place.pod)
   const listed = useQuery(listQuery(place, folder, "")).data?.items ?? []
   const existing = new Set(listed.map((e) => e.name))
-  const replacing = chosen.filter((f) => existing.has(f.name))
   const tooLarge = chosen.filter((f) => f.size > files.limits.transfer)
   const start = async () => {
     onClose()
-    const state: Upload[] = chosen.map((f) => ({
-      name: f.name,
-      size: f.size,
-      done: 0,
-      state: "waiting",
-    }))
-    const update = (index: number, change: Partial<Upload>) => {
-      state[index] = { ...state[index]!, ...change }
-      onProgress([...state])
-    }
-    onProgress([...state])
-    for (const [index, file] of chosen.entries()) {
-      update(index, { state: "sending" })
-      try {
-        await send(place, join(folder, file.name), file, existing.has(file.name), (done) =>
-          update(index, { done }),
-        )
-        update(index, { state: "done", done: file.size })
-      } catch (error) {
-        update(index, { state: "failed", problem: toProblem(error) })
-      }
-    }
+    await sendAll(
+      chosen,
+      (file, progress) =>
+        send(place, join(folder, file.name), file, existing.has(file.name), progress),
+      onProgress,
+    )
     await refresh()
   }
   return (
@@ -1341,25 +1117,7 @@ function UploadDialog({
           {folder}
         </span>
       </p>
-      <ul className="flex flex-col divide-y rounded-lg border">
-        {chosen.map((file) => (
-          <li key={file.name} className="flex items-center gap-3 px-3 py-2">
-            <span className="min-w-0 flex-1 truncate font-mono" translate="no">
-              {file.name}
-            </span>
-            {existing.has(file.name) ? (
-              <span className="type-meta text-warn-strong">{t("files.replaces")}</span>
-            ) : null}
-            <span className="type-meta text-muted-foreground tabular-nums">{size(file.size)}</span>
-          </li>
-        ))}
-      </ul>
-      {replacing.length > 0 ? (
-        <Alert variant="warn" role="note">
-          <WarningFillIcon aria-hidden="true" />
-          <AlertDescription>{t("files.replaceWarning", replacing.length)}</AlertDescription>
-        </Alert>
-      ) : null}
+      <ChosenFiles chosen={chosen} existing={existing} />
       {tooLarge.length > 0 ? (
         <Alert variant="destructive" role="note">
           <WarningFillIcon aria-hidden="true" />
@@ -1374,70 +1132,5 @@ function UploadDialog({
       )}
       <LostWarning mount={mountOf(files.mounts, folder)} />
     </Confirm>
-  )
-}
-
-function UploadProgress({ uploads, onDismiss }: { uploads: Upload[]; onDismiss: () => void }) {
-  const t = useT()
-  const size = useSize()
-  const finished = uploads.every((u) => u.state === "done" || u.state === "failed")
-  return (
-    <Card variant="list" aria-live="polite">
-      <div className="flex min-h-11 items-center gap-2 px-4">
-        <UploadSimpleIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-        <h2 className="min-w-0 flex-1 truncate text-sm font-medium">
-          {finished ? t("files.uploadsDone", uploads.length) : t("files.uploading", uploads.length)}
-        </h2>
-        {finished ? (
-          <Button variant="ghost" size="xs" onClick={onDismiss}>
-            {t("common.close")}
-          </Button>
-        ) : null}
-      </div>
-      <ul className="flex flex-col divide-y">
-        {uploads.map((upload) => {
-          const share =
-            upload.size === 0 ? (upload.state === "done" ? 1 : 0) : upload.done / upload.size
-          return (
-            <li key={upload.name} className="flex flex-col gap-1.5 px-4 py-2.5">
-              <div className="flex items-center gap-3 text-sm">
-                <span className="min-w-0 flex-1 truncate font-mono" translate="no">
-                  {upload.name}
-                </span>
-                <span className="type-meta text-muted-foreground tabular-nums">
-                  {upload.state === "done"
-                    ? t("files.uploaded")
-                    : upload.state === "waiting"
-                      ? t("files.waiting")
-                      : upload.state === "failed"
-                        ? t("files.failed")
-                        : t("files.of", size(upload.done), size(upload.size))}
-                </span>
-              </div>
-              {upload.problem ? (
-                <Problem problem={upload.problem} />
-              ) : (
-                <div
-                  className="h-1 overflow-hidden rounded-full bg-muted"
-                  role="progressbar"
-                  aria-label={upload.name}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.round(share * 100)}
-                >
-                  <div
-                    className={cn(
-                      "h-full w-(--share) rounded-full",
-                      upload.state === "done" ? "bg-ok" : "bg-progress",
-                    )}
-                    style={{ "--share": `${share * 100}%` }}
-                  />
-                </div>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-    </Card>
   )
 }

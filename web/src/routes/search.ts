@@ -123,22 +123,49 @@ interface StoreSearch<Tab> {
   pod?: string
 }
 
+const storeFields = <Tab extends string>(
+  tab: Tab | undefined,
+  mode: "yaml" | undefined,
+  pod: string | undefined,
+): StoreSearch<Tab> => ({
+  tab: tab === "overview" ? undefined : tab,
+  mode: tab === "settings" ? mode : undefined,
+  pod: tab === "logs" || tab === "events" ? pod : undefined,
+})
+
 const storeSearch = <const Tabs extends readonly string[]>(tabs: Tabs) =>
   z.pipe(
     z.object({ tab: choice(tabs), mode: choice(["yaml"]), pod: text }),
-    z.transform(({ tab, mode, pod }): StoreSearch<Tabs[number]> => ({
-      tab: tab === "overview" ? undefined : tab,
-      mode: tab === "settings" ? mode : undefined,
-      pod: tab === "logs" || tab === "events" ? pod : undefined,
-    })),
+    z.transform(({ tab, mode, pod }) => storeFields(tab, mode, pod)),
   )
 
 export const databaseSearch = storeSearch(databaseTabs)
 
-export const objectStorageTabs = ["overview", "logs", "events", "settings"] as const
+export const objectStorageTabs = ["overview", "files", "logs", "events", "settings"] as const
 export type ObjectStorageTab = (typeof objectStorageTabs)[number]
 
-export const objectStorageSearch = storeSearch(objectStorageTabs)
+/** The search of an object store's page: Files adds the bucket and the folder open in it. */
+interface ObjectStorageSearch extends StoreSearch<ObjectStorageTab> {
+  /** The bucket's S3 name; the first bucket when absent. */
+  bucket?: string
+  /** The folder open in it, ending in `/`; the bucket's top when absent. */
+  prefix?: string
+}
+
+export const objectStorageSearch = z.pipe(
+  z.object({
+    tab: choice(objectStorageTabs),
+    mode: choice(["yaml"]),
+    pod: text,
+    bucket: text,
+    prefix: text,
+  }),
+  z.transform(({ tab, mode, pod, bucket, prefix }): ObjectStorageSearch => ({
+    ...storeFields(tab, mode, pod),
+    bucket: tab === "files" ? bucket : undefined,
+    prefix: tab === "files" && prefix?.endsWith("/") ? prefix : undefined,
+  })),
+)
 
 export const objectsSearch = z.object({
   q: text,
