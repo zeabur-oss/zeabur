@@ -100,9 +100,15 @@ const nextSection: KeyboardCoordinateGetter = (event, { context }) => {
   const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.code]
   if (!step) return undefined
   event.preventDefault()
-  const rects = [...context.droppableRects.entries()].toSorted(([, a], [, b]) => a.top - b.top)
-  const at = rects.findIndex(([id]) => id === context.over?.id)
-  const target = rects[Math.min(Math.max(at + step, 0), rects.length - 1)]?.[1]
+  const rects = context.droppableContainers
+    .getEnabled()
+    .flatMap((c) => {
+      const rect = c.node.current?.getBoundingClientRect()
+      return rect ? [{ id: c.id, rect }] : []
+    })
+    .toSorted((a, b) => a.rect.top - b.rect.top)
+  const at = rects.findIndex((r) => r.id === context.over?.id)
+  const target = rects[Math.min(Math.max(at + step, 0), rects.length - 1)]?.rect
   return target ? { x: target.left + 8, y: target.top + 8 } : undefined
 }
 
@@ -145,19 +151,34 @@ function GroupDialog({
         : t("group.stays", nameOf(active.id)),
     onDragCancel: ({ active }) => t("group.stays", nameOf(active.id)),
   }
+  const [dragging, setDragging] = useState(false)
   const drop = ({ active, over }: DragEndEvent) => {
+    setDragging(false)
     if (!over || typeof active.id !== "string") return
     setPlacement({ ...placement, [active.id]: groupOf(over.id) })
   }
   return (
-    <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
+    // Escape during a drag cancels the drag only.
+    <Dialog open onOpenChange={(next) => (next || dragging ? undefined : onClose())}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader closeLabel={t("common.close")}>
           <DialogTitle>{t("group.edit")}</DialogTitle>
           <DialogDescription>{t("group.hint")}</DialogDescription>
         </DialogHeader>
         <DialogBody>
-          <div className="flex flex-col gap-4">
+          {/* The dialog stops the arrow keys and Escape before the document, where dnd-kit
+              listens. */}
+          <div
+            className="flex flex-col gap-4"
+            onKeyDown={(event) => {
+              if (!dragging || !(event.key.startsWith("Arrow") || event.key === "Escape")) return
+              event.preventDefault()
+              event.stopPropagation()
+              document.dispatchEvent(
+                new KeyboardEvent("keydown", { key: event.key, code: event.code }),
+              )
+            }}
+          >
             <DndContext
               sensors={sensors}
               collisionDetection={collision}
@@ -165,6 +186,8 @@ function GroupDialog({
                 announcements,
                 screenReaderInstructions: { draggable: t("group.dragHint") },
               }}
+              onDragStart={() => setDragging(true)}
+              onDragCancel={() => setDragging(false)}
               onDragEnd={drop}
             >
               {sections.map((section) => (
@@ -202,7 +225,7 @@ function Section({ section, label }: { section: GroupSection; label: string }) {
         isOver && "border-v2-border-strong bg-v2-surface-hover",
       )}
     >
-      <h3 className="flex items-center gap-2 px-1 py-1 type-label">
+      <h3 className="flex items-center gap-2 px-1 py-1 text-xs font-medium text-secondary">
         <FolderSimpleIcon aria-hidden="true" className="size-4 shrink-0" />
         <span className="min-w-0 flex-1 truncate" translate={section.name ? "no" : undefined}>
           {label}
