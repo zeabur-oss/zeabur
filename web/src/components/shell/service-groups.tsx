@@ -262,7 +262,7 @@ function Row({ service }: { service: Service }) {
           : undefined
       }
       className={cn(
-        "flex h-10 items-center gap-2 rounded-lg border border-v2-border bg-card px-2 type-body outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "flex h-10 items-center gap-2 rounded-lg border border-v2-border bg-card px-2 type-body",
         managed ? "text-tertiary" : "cursor-grab touch-manipulation",
         transform && "translate-x-(--drag-x) translate-y-(--drag-y)",
         isDragging && "relative z-10 cursor-grabbing shadow-lg",
