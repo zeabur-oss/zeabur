@@ -21,8 +21,8 @@
 //! token; the client uploads the folder after the plan.
 //!
 //! When Zeabur has a public URL, the `Build` that [`crate::Change::CreateBuiltService`] or
-//! [`crate::Change::SetBuild`] writes carries [`annotations::DETAILS_URL`]: the service's Builds tab, which
-//! Zeabur Builder links its commit statuses to.
+//! [`crate::Change::SetBuild`] writes carries [`annotations::DETAILS_URL`]: the service's Builds
+//! tab, which Zeabur Builder links its commit statuses to.
 
 use std::collections::BTreeMap;
 
