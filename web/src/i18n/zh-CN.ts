@@ -2307,13 +2307,6 @@ export const zhCN: Messages = {
   "clusterBackups.copy.into": (source, into) =>
     `备份会还原到新项目 ${into}，服务、卷和数据库都是另外一份。${source} 不会变动。`,
   "clusterBackups.copy.keep": (source) => `原来的项目 ${source} 会继续保留，不需要时请删除。`,
-  "clusterBackups.copy.amount": (cpu, memory) => `${cpu}、${memory} 内存`,
-  "clusterBackups.copy.short": (need, free) =>
-    `两个项目会同时运行。新项目需要 ${need}，节点只剩 ${free}，部分服务可能无法启动。先停掉用不到的服务，或加一台节点。`,
-  "clusterBackups.copy.fits": (need, free) =>
-    `两个项目会同时运行：新项目需要 ${need}，节点还剩 ${free}。`,
-  "clusterBackups.copy.roomUnknown": (need) =>
-    `两个项目会同时运行，新项目需要 ${need}。Zeabur 读不到节点还剩多少资源。`,
   "clusterBackups.copy.webhooks": (source) => `自动部署和 Git webhook 仍然会发到 ${source}。`,
   "clusterBackups.goneBody": (source) =>
     `${source} 已经不存在，会用原来的名称还原。域名等你确认过项目后，最后再接回来。`,
@@ -2562,8 +2555,6 @@ export const zhCN: Messages = {
   "add.templateFilter": "筛选模板",
   "add.templateNoMatch": (query) => `没有符合“${query}”的模板。`,
   "add.templateNeeds": (cpu, memory) => `需要 ${cpu} CPU、${memory} 内存`,
-  "add.templateTightMemory": "集群内存不够",
-  "add.templateTightCpu": "集群 CPU 不够",
   "add.installFirst": (names) => `需要先安装 ${names}`,
   "add.templateDeploy": (name) => `部署 ${name}`,
   "add.templateBack": "所有模板",
@@ -2573,11 +2564,6 @@ export const zhCN: Messages = {
     `Zeabur 无法确认 ${names} 是否已安装；如果没装，检查变更时会提醒你。`,
   "add.templateNoIssuer":
     "这个应用需要 HTTPS，但 Zeabur 还没指定证书签发者。管理员可以在启动 Zeabur 时用 --cluster-issuer 指定。",
-  "add.templateRoom": (use, free) => `集群放得下：需要 ${use} 内存，目前还剩 ${free}。`,
-  "add.templateLowMemory": (use, free) =>
-    `集群内存不够：需要 ${use}，所有节点加起来还有 ${free}，但每个 Pod 都要放得进单个节点。先腾出空间或加一台节点。`,
-  "add.templateLowCpu": (use, free) =>
-    `集群 CPU 不够：需要 ${use}，所有节点加起来还有 ${free}，但每个 Pod 都要放得进单个节点。先腾出空间或加一台节点。`,
   "add.templateGenerated": (secrets) => `密码和密钥会在你的浏览器生成，存进机密变量 ${secrets}。`,
   "add.templateInputEmpty": "这一栏必填。",
   "add.templateInputInvalid": (pattern) => `格式不符（${pattern}）。`,
@@ -3863,12 +3849,6 @@ export const zhCN: Messages = {
   "domainPages.noServer": "这个项目还没有页面服务器",
   "domainPages.noServerHint":
     "这些页面由 Error pages 模板提供，模板是一个小型 nginx。开启任一开关或编辑页面时，会一并部署到这个项目。",
-  "domainPages.room": (use, free) =>
-    `集群还有空间：页面服务器大约需要 ${use} 内存，目前还有 ${free} 可用。`,
-  "domainPages.tightMemory": (use, free) =>
-    `集群的内存不太够：页面服务器大约需要 ${use}，所有节点加起来还有 ${free}，但它要放得进单个节点。先腾出空间或加一个节点。`,
-  "domainPages.tightCpu": (use, free) =>
-    `集群的 CPU 不太够：页面服务器大约需要 ${use}，所有节点加起来还有 ${free}，但它要放得进单个节点。先腾出空间或加一个节点。`,
   "domainPages.page": "要编辑的页面",
   "domainPages.page.maintenance": "维护",
   "domainPages.page.badGateway": "502 网关错误",
