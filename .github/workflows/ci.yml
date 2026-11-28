@@ -308,7 +308,7 @@ jobs:
   # One issue for each failing nightly job, opened or updated while it fails, closed when it passes.
   nightly-issues:
     if: always() && github.event_name == 'schedule'
-    needs: [fuzz, canary, e2e-full, zeaburctl-windows]
+    needs: [fuzz, canary, e2e-full, zeaburctl-windows-inputs, zeaburctl-windows]
     runs-on: instabox-small
     timeout-minutes: 120
     permissions:
@@ -335,7 +335,20 @@ jobs:
     name: ci / ok
     if: always()
     needs:
-      [lint, test, ui, desktop, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full, zeaburctl-windows, docs]
+      - lint
+      - test
+      - ui
+      - desktop
+      - fuzz
+      - canary
+      - no-ui
+      - wording
+      - cluster
+      - e2e
+      - e2e-full
+      - zeaburctl-windows-inputs
+      - zeaburctl-windows
+      - docs
     runs-on: instabox-small
     timeout-minutes: 5
     steps:
