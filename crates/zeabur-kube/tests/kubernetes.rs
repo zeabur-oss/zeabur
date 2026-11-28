@@ -19,10 +19,10 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use k8s_openapi::api::authentication::v1::SelfSubjectReview;
-    use k8s_openapi::api::core::v1::{ConfigMap, Node, Pod, ResourceQuota};
+    use k8s_openapi::api::core::v1::{ConfigMap, Namespace, Node, Pod, ResourceQuota};
     use k8s_openapi::api::rbac::v1::{ClusterRole, ClusterRoleBinding, Role, RoleBinding};
     use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
-    use kube::api::{Api, ListParams, PostParams};
+    use kube::api::{Api, ListParams, Patch, PatchParams, PostParams};
     use serde_json::json;
     use zeabur_kube::{
         Cluster as _, ClusterError, ClusterExt as _, ExecRequest, ExitStatus, ObjectTarget,
@@ -333,6 +333,53 @@ mod tests {
         };
         assert_eq!(status.code, 422, "{status:?}");
         assert_eq!(status.reason, "Invalid", "{status:?}");
+    }
+
+    /// kube-apiserver's `Warning` headers come back with the write: Pod Security admission in
+    /// `warn` mode admits a Pod that breaks the level and says why, a dry run included.
+    #[tokio::test]
+    #[ignore = "needs a disposable cluster"]
+    async fn a_write_returns_what_kube_apiserver_warns_about() {
+        let sandbox = Sandbox::new(
+            "zeabur-warnings",
+            json!([{"apiGroups": [""], "resources": ["pods"], "verbs": ["create"]}]),
+        )
+        .await;
+        Api::<Namespace>::all(sandbox.admin().clone())
+            .patch(
+                sandbox.namespace(),
+                &PatchParams::default(),
+                &Patch::Merge(json!({"metadata": {"labels": {
+                    "pod-security.kubernetes.io/warn": "restricted"
+                }}})),
+            )
+            .await
+            .expect("warn label");
+        let pod = WriteRequest {
+            target: ObjectTarget {
+                api_version: "v1".to_owned(),
+                kind: "Pod".to_owned(),
+                plural: "pods".to_owned(),
+                namespace: sandbox.namespace().to_owned(),
+                name: "web".to_owned(),
+            },
+            body: WriteBody::Create(json!({
+                "apiVersion": "v1",
+                "kind": "Pod",
+                "metadata": {"name": "web"},
+                "spec": {"containers": [{"name": "web", "image": "busybox"}]}
+            })),
+            dry_run: true,
+        };
+        let written = sandbox.user().write(&pod).await.expect("dry run");
+        assert!(
+            written
+                .warnings
+                .iter()
+                .any(|w| w.starts_with(r#"would violate PodSecurity "restricted:latest""#)),
+            "{:?}",
+            written.warnings
+        );
     }
 
     fn refused<T: std::fmt::Debug>(result: Result<T, ClusterError>) -> bool {

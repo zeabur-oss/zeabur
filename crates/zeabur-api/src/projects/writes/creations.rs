@@ -144,27 +144,37 @@ pub(super) fn already_exist(objects: &str, project: &str) -> Problem {
 
 /// Sends every write of a plan that creates objects as a dry run, as the person: what their
 /// rights, validation (an object's name too), quotas and admission policies would refuse is
-/// refused now, at the object it is about.
+/// refused now, at the object it is about. What kube-apiserver warns about goes on the object.
 pub(super) async fn dry_run(
     cluster: &dyn Cluster,
     project: &str,
-    plan: &Plan,
+    plan: &mut Plan,
 ) -> Result<(), ApiError> {
-    for object in &plan.objects {
+    for i in 0..plan.objects.len() {
+        let Some(object) = plan.objects.get(i) else {
+            break;
+        };
         let write = WriteRequest {
             dry_run: true,
             ..super::write_request(project, &object.target, &object.write)
         };
-        if let Err(error) = cluster.write(&write).await {
-            let mut problem = refused(cluster, project, &object.target, &write, error).await;
-            if let Some(change) = object.change {
-                problem.at = Some(ProblemAt {
-                    change,
-                    line: None,
-                    field: problem.fields.first().map(|f| f.field.clone()),
-                });
+        match cluster.write(&write).await {
+            Ok(written) => {
+                if let Some(object) = plan.objects.get_mut(i) {
+                    object.warnings = written.warnings;
+                }
             }
-            return Err(ApiError::from(without_secret_values(problem, plan)));
+            Err(error) => {
+                let mut problem = refused(cluster, project, &object.target, &write, error).await;
+                if let Some(change) = object.change {
+                    problem.at = Some(ProblemAt {
+                        change,
+                        line: None,
+                        field: problem.fields.first().map(|f| f.field.clone()),
+                    });
+                }
+                return Err(ApiError::from(without_secret_values(problem, plan)));
+            }
         }
     }
     Ok(())
@@ -173,6 +183,32 @@ pub(super) async fn dry_run(
 /// `problem` without any value a Secret in `plan` has once written, as written or base64: a
 /// message from kube-apiserver or a policy may quote the object, as a `422` to a patch does.
 pub(super) fn without_secret_values(problem: Problem, plan: &Plan) -> Problem {
+    let values = secret_values(plan);
+    if values.is_empty() {
+        return problem;
+    }
+    let Ok(mut json) = serde_json::to_value(&problem) else {
+        return problem;
+    };
+    scrub(&mut json, &values);
+    serde_json::from_value(json).unwrap_or(problem)
+}
+
+/// `plan` without any value a Secret in it has once written in the warnings of its objects, as
+/// [`without_secret_values`] for a problem: an admission webhook or policy may quote the object.
+pub(super) fn warnings_without_secret_values(plan: &mut Plan) {
+    let values = secret_values(plan);
+    if values.is_empty() {
+        return;
+    }
+    for warning in plan.objects.iter_mut().flat_map(|o| &mut o.warnings) {
+        scrub_text(warning, &values);
+    }
+}
+
+/// The values the Secrets of `plan` hold once written, as written and in or out of base64, the
+/// longest first.
+fn secret_values(plan: &Plan) -> Vec<String> {
     let mut values: Vec<String> = Vec::new();
     for object in &plan.objects {
         if !(object.target.api_version == "v1" && object.target.kind == "Secret") {
@@ -199,29 +235,24 @@ pub(super) fn without_secret_values(problem: Problem, plan: &Plan) -> Problem {
         }
     }
     values.retain(|v| !v.is_empty());
-    if values.is_empty() {
-        return problem;
-    }
     values.sort_by_key(|v| std::cmp::Reverse(v.len()));
-    let Ok(mut json) = serde_json::to_value(&problem) else {
-        return problem;
-    };
-    scrub(&mut json, &values);
-    serde_json::from_value(json).unwrap_or(problem)
+    values
 }
 
 fn scrub(value: &mut Value, secrets: &[String]) {
     match value {
-        Value::String(text) => {
-            for secret in secrets {
-                if text.contains(secret.as_str()) {
-                    *text = text.replace(secret.as_str(), zeabur_graph::manifest::HIDDEN);
-                }
-            }
-        }
+        Value::String(text) => scrub_text(text, secrets),
         Value::Array(items) => items.iter_mut().for_each(|v| scrub(v, secrets)),
         Value::Object(map) => map.values_mut().for_each(|v| scrub(v, secrets)),
         Value::Null | Value::Bool(_) | Value::Number(_) => {}
+    }
+}
+
+fn scrub_text(text: &mut String, secrets: &[String]) {
+    for secret in secrets {
+        if text.contains(secret.as_str()) {
+            *text = text.replace(secret.as_str(), zeabur_graph::manifest::HIDDEN);
+        }
     }
 }
 

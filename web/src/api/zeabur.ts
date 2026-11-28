@@ -4283,6 +4283,15 @@ export type ObjectWrite = {
   /** What the write does. */
   op: WriteOp
   /**
+   * What kube-apiserver warned about when the plan dry-ran the write, as the text of its
+   * `Warning` headers. The plan dry-runs the change of a Namespace that exists, so Pod
+   * Security admission names the Pods in it that break a new `enforce` level
+   * [k8s-psa-labels]; empty for other writes.
+   *
+   * [k8s-psa-labels]: https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces
+   */
+  warnings?: string[]
+  /**
    * The object as it is written, YAML; absent for a deletion.
    * @nullable
    */
@@ -8858,6 +8867,12 @@ export type PlannedObject = {
   resourceVersion?: string | null
   /** The object. */
   target: PlanTarget
+  /**
+   * What kube-apiserver warned about when the plan dry-ran the write, or a Pod the write
+   * starts, as the text of its `Warning` headers: Pod Security admission, a deprecated API, a
+   * `ValidatingAdmissionPolicy` that warns. Empty for a write the plan does not dry-run.
+   */
+  warnings?: string[]
   /** The write. */
   write: PlannedWrite
 }

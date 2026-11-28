@@ -698,6 +698,9 @@ pub struct Written {
     /// The object as kube-apiserver answered, with its defaults and admission's changes; `None`
     /// for a delete.
     pub object: Option<serde_json::Value>,
+    /// The text of each `Warning` header of the answer, a dry run's too: what Pod Security
+    /// admission, a deprecated API or a `ValidatingAdmissionPolicy` says about a write it allows.
+    pub warnings: Vec<String>,
 }
 
 pub use zeabur_core::names::GatewayRef;

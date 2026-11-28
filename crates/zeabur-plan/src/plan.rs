@@ -1793,6 +1793,7 @@ impl<'a> Planner<'a> {
                 resource_version,
                 write,
                 change,
+                warnings: Vec::new(),
                 raw_after: working.current,
             });
         }

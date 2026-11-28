@@ -846,6 +846,45 @@ mod tests {
         );
     }
 
+    /// Pod Security admission names the Pods that break a new level of a Namespace that exists in
+    /// the dry run's warnings, and the plan shows them at the Namespace's write.
+    #[tokio::test]
+    async fn the_plan_shows_what_a_namespace_change_warns_about() {
+        let cluster = cluster();
+        put(
+            &cluster,
+            json!({"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": "cert-manager"}}),
+        );
+        let warning = "existing pods in namespace \"cert-manager\" violate the new PodSecurity \
+                       enforce level \"restricted:latest\"";
+        cluster.update(|s| {
+            s.write_warnings.insert(
+                "Namespace/cert-manager".to_owned(),
+                vec![warning.to_owned()],
+            );
+        });
+        let (status, plan) = call(&app(&cluster, false), "plan", "install", "0.6.1").await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        let writes: Vec<&Value> = plan["steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|s| s["writes"].as_array().unwrap())
+            .collect();
+        let namespace = writes
+            .iter()
+            .find(|w| w["kind"] == "Namespace" && w["name"] == "cert-manager")
+            .unwrap();
+        assert_eq!(namespace["warnings"], json!([warning]));
+        assert!(
+            writes
+                .iter()
+                .filter(|w| w["kind"] != "Namespace")
+                .all(|w| w.get("warnings").is_none()),
+            "{writes:?}"
+        );
+    }
+
     #[tokio::test]
     async fn a_certificate_outside_cert_managers_namespace_keeps_it() {
         let cluster = cluster();
