@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test"
 
 import type { Schemas } from "@/api/client"
-import { busiest, usageWarnings } from "@/model/usage-warning"
+import { busiest, rowWarnings, usageWarnings } from "@/model/usage-warning"
 import type { Service } from "@/model/service"
 
 const MiB = 2 ** 20
@@ -55,5 +55,23 @@ describe("the busiest pod of a service", () => {
 
   test("is empty without usage", () => {
     expect(busiest(service, undefined).get("app")).toBeUndefined()
+  })
+})
+
+describe("the warnings under a CPU or memory row", () => {
+  const amounts = { cpuRequest: "100m", cpuLimit: "", memoryRequest: "", memoryLimit: "512Mi" }
+
+  test("read the row's own amounts and the usage of the same resource", () => {
+    const found = rowWarnings("bytes", amounts, { cpu: 5, memory: 500 * MiB })
+    expect(found?.nearLimit).toStrictEqual({ limit: 512 * MiB })
+    expect(found?.aboveRequest).toBeUndefined()
+    expect(rowWarnings("cpu", amounts, { cpu: 0.2, memory: 0 })?.aboveRequest).toStrictEqual({
+      request: 0.1,
+    })
+  })
+
+  test("have nothing to say without a sample or when usage is fine", () => {
+    expect(rowWarnings("cpu", amounts, undefined)).toBeUndefined()
+    expect(rowWarnings("cpu", amounts, { cpu: 0.05, memory: 0 })).toBeUndefined()
   })
 })

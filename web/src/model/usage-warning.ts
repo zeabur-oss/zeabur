@@ -51,3 +51,30 @@ export function usageWarnings(
     warnings.aboveRequest = { request: reserved }
   return warnings
 }
+
+/** A container's four amounts as typed in the form. */
+export interface TypedAmounts {
+  cpuRequest: string
+  memoryRequest: string
+  cpuLimit: string
+  memoryLimit: string
+}
+
+/** What the busiest pod's usage says about the CPU or the memory amounts as typed; `undefined`
+ * when there is nothing to say. */
+export function rowWarnings(
+  dimension: Dimension,
+  amounts: TypedAmounts | undefined,
+  sample: { cpu: number; memory: number } | undefined,
+): (UsageWarnings & { used: number }) | undefined {
+  if (!amounts || !sample) return undefined
+  const cpu = dimension === "cpu"
+  const used = cpu ? sample.cpu : sample.memory
+  const found = usageWarnings(
+    dimension,
+    cpu ? amounts.cpuRequest : amounts.memoryRequest,
+    cpu ? amounts.cpuLimit : amounts.memoryLimit,
+    used,
+  )
+  return found.nearLimit || found.aboveRequest ? { ...found, used } : undefined
+}

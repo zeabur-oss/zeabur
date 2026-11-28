@@ -15,7 +15,7 @@ import { serviceSettingsSections } from "@/modules/service-settings"
 import { refusedField } from "@/model/problem"
 import { endpointsOf, type Endpoint, type Network, type Service } from "@/model/service"
 import { AmountInput } from "@/components/amount-input"
-import { busiest, usageWarnings } from "@/model/usage-warning"
+import { busiest, rowWarnings } from "@/model/usage-warning"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { FormField } from "@/components/form-field"
 import { aboveLimit, isAmount, type Dimension } from "@/lib/amount"
@@ -129,33 +129,42 @@ function UsageWarnings({
   const t = useT()
   const { millicores, memory } = useQuantityFormat()
   const cpu = row === "cpuRequest"
-  if (!amounts || !sample) return null
+  const found = rowWarnings(cpu ? "cpu" : "bytes", amounts, sample)
+  if (!found) return null
   const show = cpu ? (cores: number) => millicores(cores * 1000) : memory
-  const used = cpu ? sample.cpu : sample.memory
-  const { nearLimit, aboveRequest } = usageWarnings(
-    cpu ? "cpu" : "bytes",
-    cpu ? amounts.cpuRequest : amounts.memoryRequest,
-    cpu ? amounts.cpuLimit : amounts.memoryLimit,
-    used,
-  )
-  if (!nearLimit && !aboveRequest) return null
+  const lines = [
+    found.nearLimit && t("form.nearLimit", show(found.used), show(found.nearLimit.limit)),
+    found.aboveRequest &&
+      t("form.aboveRequest", show(found.used), show(found.aboveRequest.request)),
+  ]
   return (
     <div className="flex flex-col gap-2 sm:col-span-2">
-      {nearLimit ? (
-        <Alert variant="warn" role="note">
-          <AlertDescription>
-            {t("form.nearLimit", show(used), show(nearLimit.limit))}
-          </AlertDescription>
-        </Alert>
-      ) : null}
-      {aboveRequest ? (
-        <Alert variant="warn" role="note">
-          <AlertDescription>
-            {t("form.aboveRequest", show(used), show(aboveRequest.request))}
-          </AlertDescription>
-        </Alert>
-      ) : null}
+      {lines.map((line) =>
+        line ? (
+          <Alert key={line} variant="warn" role="note">
+            <AlertDescription>{line}</AlertDescription>
+          </Alert>
+        ) : null,
+      )}
     </div>
+  )
+}
+
+/** The size of the biggest node, as a line under the form. */
+function LargestNode() {
+  const t = useT()
+  const { cores, memory } = useQuantityFormat()
+  const nodes = useQuery(nodesQuery)
+  const largest = nodes.data?.items.reduce<Schemas.Resources | undefined>(
+    (best, node) =>
+      !best || node.allocatable.memoryBytes > best.memoryBytes ? node.allocatable : best,
+    undefined,
+  )
+  if (!largest) return null
+  return (
+    <p className="type-meta text-muted-foreground">
+      {t("form.largestNode", cores(largest.cpuMillicores), memory(largest.memoryBytes))}
+    </p>
   )
 }
 
@@ -173,14 +182,7 @@ function Compute({
   refused: Schemas.FieldCause[]
 }) {
   const t = useT()
-  const { cores, memory } = useQuantityFormat()
   const used = useBusiest(project, service)
-  const nodes = useQuery(nodesQuery)
-  const largest = nodes.data?.items.reduce<Schemas.Resources | undefined>(
-    (best, node) =>
-      !best || node.allocatable.memoryBytes > best.memoryBytes ? node.allocatable : best,
-    undefined,
-  )
   const scalable = service.kind === "Deployment" || service.kind === "StatefulSet"
   const containers = service.containers.filter((c) => !c.init)
   const initial = {
@@ -348,11 +350,7 @@ function Compute({
           ))}
         </fieldset>
       ))}
-      {largest ? (
-        <p className="type-meta text-muted-foreground">
-          {t("form.largestNode", cores(largest.cpuMillicores), memory(largest.memoryBytes))}
-        </p>
-      ) : null}
+      <LargestNode />
     </form>
   )
 }
