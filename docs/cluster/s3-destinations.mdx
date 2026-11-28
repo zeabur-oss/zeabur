@@ -52,6 +52,7 @@ Under **Cluster** → **Backups** → **S3 destinations**, click **Add destinati
 | **Folder** | Optional. Backups go under this path. Can't contain spaces or `..`. |
 | **Region** | Enter a region if the storage provider requires one. |
 | **Access key ID**, **Secret access key** | Both are required when adding a destination. |
+| **CA certificate** | Optional. When a private CA signs the endpoint's certificate, for example on a self-hosted MinIO, paste the CA certificates in PEM format. Leave it empty when a public CA signs it. Cluster backups trust this CA; database and volume backups don't use it yet. |
 
 ![Add S3 destination form with a Backblaze B2 endpoint, bucket, and keys entered](../images/shots/s3-destination-add.avif)
 
@@ -99,7 +100,7 @@ Before revoking the old keys with the storage provider, confirm that the review 
 
 ## Do the same with kubectl
 
-A destination consists of two objects with the same name in the `zeabur-s3-destinations` namespace: a ConfigMap for the endpoint, bucket, region, and folder, and a Secret for the keys. Zeabur OSS lists the destination only when both have the label `zeabur.com/s3-destination: <name>`. Omit `region` and `prefix` if they have no values.
+A destination consists of two objects with the same name in the `zeabur-s3-destinations` namespace: a ConfigMap for the endpoint, bucket, region, and folder, and a Secret for the keys. Zeabur OSS lists the destination only when both have the label `zeabur.com/s3-destination: <name>`. Omit `region` and `prefix` if they have no values. The optional `caCert` key holds the CA certificates in PEM format.
 
 ```yaml
 apiVersion: v1

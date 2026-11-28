@@ -1,6 +1,7 @@
 // The cluster's Velero backups as the Backups tab tells them: one verdict first, then where
 // backups go, when they run, and how each went.
 import type { Schemas } from "@/api/client"
+import type { Translate } from "@/i18n"
 import { rules } from "@/api/rules"
 import { getDownloadClusterBackupUrl } from "@/api/zeabur"
 import { fits } from "@/model/rules"
@@ -49,7 +50,9 @@ export interface LocationForm {
   endpoint: string
   accessKeyId: string
   secretAccessKey: string
-  /** The S3 destination whose keys the plan copies; typed keys when absent. */
+  /** CA certificates in PEM with typed keys; empty keeps what the location trusts. */
+  caCert: string
+  /** The S3 destination whose keys and CA the plan copies; typed keys when absent. */
   destination?: string
 }
 
@@ -64,6 +67,7 @@ export const pickLocation = (destination?: Destination): Partial<LocationForm> =
         prefix: joinFolder(destination.prefix, "velero"),
         accessKeyId: "",
         secretAccessKey: "",
+        caCert: "",
       }
     : { destination: undefined }
 
@@ -75,6 +79,7 @@ export function locationForm(location: Location | undefined): LocationForm {
     endpoint: location?.endpoint ?? "",
     accessKeyId: "",
     secretAccessKey: "",
+    caCert: "",
   }
 }
 
@@ -109,6 +114,7 @@ export function locationRequest(form: LocationForm): Schemas.BackupsPlanRequest 
     accessKeyId: form.accessKeyId.trim(),
     secretAccessKey: form.secretAccessKey.trim(),
     destination: form.destination,
+    caCert: form.destination === undefined && form.caCert.trim() ? form.caCert.trim() : undefined,
   }
 }
 
@@ -204,3 +210,26 @@ export const backupDownloadUrl = getDownloadClusterBackupUrl
 /** The backup provider of `module` (`k8up`, `velero`). */
 export const providerOf = (providers: Schemas.BackupProvider[] | undefined, module: string) =>
   providers?.find((p) => p.module === module)
+
+/** The Secret a location's CA certificate is written to. */
+const CA_SECRET = "zeabur-backup-ca"
+
+/** What a plan's write is, as its line says it: "the storage keys", "project shop". */
+export function writeThing(t: Translate, write: Schemas.BackupWrite): string {
+  switch (write.kind) {
+    case "Backup":
+    case "Restore":
+    case "Namespace":
+    case "ConfigMap":
+      return t(`clusterBackups.thing.${write.kind}`, write.name)
+    case "Ingress":
+    case "HTTPRoute":
+      return t("clusterBackups.thing.route", write.namespace ?? "", write.name)
+    case "Secret":
+      return t(
+        write.name === CA_SECRET ? "clusterBackups.thing.caSecret" : "clusterBackups.thing.Secret",
+      )
+    default:
+      return t(`clusterBackups.thing.${write.kind as "Secret"}`)
+  }
+}

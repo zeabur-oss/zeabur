@@ -34,7 +34,9 @@ Store backups outside the cluster, such as in Cloudflare R2, Backblaze B2, or AW
 
 Under **Where backups go**, click **Set up** or **Edit**. If you've registered S3 destinations, the **S3 destination** menu selects the first one by default and fills in its location and keys. To enter them yourself, select **Enter manually**.
 
-For manual entry, fill in **Bucket**, **Access key ID**, and **Secret access key**. Leave **Endpoint** blank for AWS S3. For R2, B2, or MinIO, enter the provider's S3 address. **Region** defaults to `us-east-1` when left blank. **Folder** is optional and keeps these backups separate from other files.
+For manual entry, fill in **Bucket**, **Access key ID**, and **Secret access key**. Leave **Endpoint** blank for AWS S3. For R2, B2, or MinIO, enter the provider's S3 address. **Region** defaults to `us-east-1` when left blank. **Folder** is optional and keeps these backups separate from other files. When a private CA signs the endpoint's certificate, paste the CA certificates in **CA certificate**.
+
+Velero trusts the CA of the selected destination, or the one you enter, through the Secret `zeabur-backup-ca` in Velero's namespace. When you later change the destination's CA, edit the location and apply the changes again so that Velero gets the new CA.
 
 ![Backup location form with the r2-backups S3 destination selected and its endpoint and bucket filled in](../images/shots/backup-location-form.avif)
 

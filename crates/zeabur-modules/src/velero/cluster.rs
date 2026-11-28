@@ -8,7 +8,10 @@
 //! - The location `default` in Velero's namespace, through the AWS plugin, which speaks to any
 //!   S3-compatible store (`s3Url`, path-style addressing) [velero-aws]. Its keys go in the Secret
 //!   [`CREDENTIALS`] as an AWS credentials file under [`CREDENTIALS_KEY`], named by the location's
-//!   `spec.credential` [velero-bsl]; a location that names no Secret keeps Velero's own.
+//!   `spec.credential` [velero-bsl]; a location that names no Secret keeps Velero's own. A store
+//!   whose certificate a private CA signs has that CA in the Secret [`CA`] under [`CA_KEY`], named
+//!   by `spec.objectStorage.caCertRef`, which must be in the location's namespace and replaces the
+//!   deprecated `caCert` [velero-bsl-1.18].
 //! - The schedule [`SCHEDULE`]: its cron, the namespaces it covers (`*` for all), its `ttl`, and
 //!   file-system backup of every volume (`defaultVolumesToFsBackup`) [velero-fsb], since local-path
 //!   volumes have no snapshots. That setting follows the node agent ([`NODE_AGENT`]): a cluster
@@ -41,6 +44,7 @@
 //! `velero.io/backup-name` label [velero-fsb]; objects add little to that.
 //!
 //! [velero-bsl]: https://velero.io/docs/v1.17/api-types/backupstoragelocation/
+//! [velero-bsl-1.18]: https://velero.io/docs/v1.18/api-types/backupstoragelocation/
 //! [velero-schedule]: https://velero.io/docs/v1.17/api-types/schedule/
 //! [velero-backup]: https://velero.io/docs/v1.17/api-types/backup/
 //! [velero-fsb]: https://velero.io/docs/v1.17/file-system-backup/
@@ -99,6 +103,10 @@ pub const SCHEDULE: &str = "zeabur";
 pub const CREDENTIALS: &str = "zeabur-backup-credentials";
 /// Its key.
 pub const CREDENTIALS_KEY: &str = "cloud";
+/// The Secret holding the CA certificates of the location's store, in PEM.
+pub const CA: &str = "zeabur-backup-ca";
+/// Its key.
+pub const CA_KEY: &str = "ca.crt";
 /// The Secret holding the SSE-C key of a location Zeabur creates, as the catalog names it.
 pub const BACKUP_KEY: &str = "velero-backup-key";
 /// Its key. The AWS plugin needs a value of exactly 32 bytes.
@@ -148,6 +156,10 @@ pub struct Location {
     /// The Secret holding its keys; absent when it uses Velero's own.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub credential: Option<String>,
+    /// The Secret holding the CA certificates it trusts for the store (`caCertRef`); absent when
+    /// it trusts the system's.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ca_cert_ref: Option<String>,
     /// Whether Velero can reach it.
     pub phase: LocationPhase,
     /// When Velero last checked.
@@ -333,6 +345,7 @@ pub fn location(object: &DynamicObject) -> Location {
         region: text(object, "/spec/config/region"),
         endpoint: text(object, "/spec/config/s3Url"),
         credential: text(object, "/spec/credential/name"),
+        ca_cert_ref: text(object, "/spec/objectStorage/caCertRef/name"),
         phase,
         last_validated_at: time(object, "/status/lastValidationTime"),
         message: text(object, "/status/message"),
@@ -552,6 +565,10 @@ pub struct LocationRequest {
     /// The endpoint, `https://…`; empty for AWS S3 itself.
     #[serde(default)]
     pub endpoint: String,
+    /// Whether it trusts the CA in [`CA`]: `true` names it in `caCertRef`, `false` removes a
+    /// `caCertRef` to it, and `None` keeps what the location names.
+    #[serde(skip)]
+    pub ca: Option<bool>,
 }
 
 /// When backups run and what they take, as a person sets it.
@@ -838,7 +855,27 @@ pub fn location_object(
             optional: None,
         });
     }
+    let storage = &mut spec.object_storage.rest;
+    match request.ca {
+        Some(true) => {
+            // Velero refuses a location with both.
+            storage.remove("caCert");
+            storage.insert("caCertRef".to_owned(), json!({"name": CA, "key": CA_KEY}));
+        }
+        Some(false) => {
+            if storage.get("caCertRef").and_then(|r| r.get("name")) == Some(&json!(CA)) {
+                storage.remove("caCertRef");
+            }
+        }
+        None => {}
+    }
     Ok(object)
+}
+
+/// The Secret with the CA certificates `pem` of the location's store.
+#[must_use]
+pub fn ca_secret(namespace: &str, pem: &str) -> Secret {
+    opaque_secret(namespace, CA, CA_KEY, pem.trim())
 }
 
 /// The keys as the AWS plugin reads them, an AWS shared credentials file.
@@ -1332,6 +1369,7 @@ mod tests {
             prefix: "/cluster/".into(),
             region: String::new(),
             endpoint: "https://minio.example.com/".into(),
+            ca: None,
         };
         let written = json_of(location_object("velero", None, &request, true).unwrap());
         assert_eq!(
@@ -1360,6 +1398,7 @@ mod tests {
             prefix: String::new(),
             region: "eu-west-1".into(),
             endpoint: String::new(),
+            ca: None,
         };
         let written = json_of(location_object("velero", Some(&current), &request, false).unwrap());
         assert_eq!(written["spec"]["accessMode"], "ReadWrite");
@@ -1369,6 +1408,44 @@ mod tests {
             json!({"region": "eu-west-1", "checksumAlgorithm": ""})
         );
         assert!(written["spec"].get("credential").is_none());
+    }
+
+    #[test]
+    fn a_location_trusts_zeaburs_ca_instead_of_an_inline_one_and_keeps_another_ref() {
+        let with = |storage: Value| {
+            json!({
+                "apiVersion": API_VERSION, "kind": "BackupStorageLocation",
+                "metadata": {"name": "default", "namespace": "velero"},
+                "spec": {"provider": "aws", "objectStorage": storage}
+            })
+        };
+        let request = |ca| LocationRequest {
+            bucket: "b".into(),
+            prefix: String::new(),
+            region: String::new(),
+            endpoint: "https://minio.lan".into(),
+            ca,
+        };
+        let storage = |current: &Value, ca| {
+            json_of(location_object("velero", Some(current), &request(ca), false).unwrap())["spec"]
+                ["objectStorage"]
+                .clone()
+        };
+        let inline = with(json!({"bucket": "b", "caCert": "LS0t"}));
+        assert_eq!(
+            storage(&inline, Some(true)),
+            json!({"bucket": "b", "caCertRef": {"name": CA, "key": CA_KEY}})
+        );
+        let ours = with(json!({"bucket": "b", "caCertRef": {"name": CA, "key": CA_KEY}}));
+        assert_eq!(storage(&ours, Some(false)), json!({"bucket": "b"}));
+        assert_eq!(storage(&ours, None), ours["spec"]["objectStorage"]);
+        let catalogs =
+            with(json!({"bucket": "b", "caCertRef": {"name": "velero-ca", "key": "ca.crt"}}));
+        assert_eq!(
+            storage(&catalogs, Some(false)),
+            catalogs["spec"]["objectStorage"]
+        );
+        assert_eq!(location(&object(ours)).ca_cert_ref.as_deref(), Some(CA));
     }
 
     #[test]
@@ -1468,6 +1545,7 @@ mod tests {
             prefix: String::new(),
             region: String::new(),
             endpoint: endpoint.into(),
+            ca: None,
         };
         assert!(location_problem(&location("Backups", "")).is_some());
         assert!(location_problem(&location("backups", "minio:9000")).is_some());

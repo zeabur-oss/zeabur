@@ -4,6 +4,9 @@ export const rules = {
   "BackupsPlanRequest.location.bucket": {
     pattern: "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$",
   },
+  "BackupsPlanRequest.location.caCert": {
+    maxLength: 65536,
+  },
   "BackupsPlanRequest.restore.into": {
     maxLength: 63,
     pattern: "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
@@ -111,6 +114,9 @@ export const rules = {
   },
   "S3DestinationFields.bucket": {
     pattern: "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$",
+  },
+  "S3DestinationFields.caCert": {
+    maxLength: 65536,
   },
   "S3DestinationFields.name": {
     maxLength: 63,

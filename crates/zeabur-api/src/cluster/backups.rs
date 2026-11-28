@@ -37,6 +37,7 @@ use zeabur_kube::{
     Cluster, ClusterError, ClusterExt as _, DynamicObject, ObjectTarget, ResourceRef, WriteBody,
     WriteRequest,
 };
+use zeabur_model::kernel::s3::is_ca_bundle;
 use zeabur_model::{Health, PodSecurityLevel};
 use zeabur_modules::backups::Outcome;
 use zeabur_modules::velero::{self, cluster as v};
@@ -217,9 +218,14 @@ pub enum BackupsPlanRequest {
         #[serde(default, rename = "secretAccessKey")]
         secret_access_key: String,
         /// An S3 destination of the cluster's list to copy the keys from, instead of the keys
-        /// given.
+        /// given. Its CA certificates replace `caCert`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         destination: Option<String>,
+        /// The CA certificates in PEM that the store's certificate chains to; empty to trust the
+        /// system's, absent to keep what the location trusts.
+        #[serde(default, rename = "caCert", skip_serializing_if = "Option::is_none")]
+        #[schema(max_length = 65536)]
+        ca_cert: Option<String>,
     },
     /// Set Zeabur's schedule.
     Schedule {
@@ -293,6 +299,7 @@ impl std::fmt::Debug for BackupsPlanRequest {
                 endpoint,
                 access_key_id,
                 destination,
+                ca_cert,
                 ..
             } => f
                 .debug_struct("Location")
@@ -302,6 +309,7 @@ impl std::fmt::Debug for BackupsPlanRequest {
                 .field("endpoint", endpoint)
                 .field("access_key_id", access_key_id)
                 .field("destination", destination)
+                .field("ca_cert", ca_cert)
                 .finish_non_exhaustive(),
             Self::Schedule {
                 cron,
@@ -876,14 +884,22 @@ fn no_schedule() -> ApiError {
     ))
 }
 
+/// What a location request gives besides the location: keys, the destination they came from,
+/// and CA certificates.
+struct Given<'a> {
+    keys: Option<(&'a str, &'a str)>,
+    destination: Option<&'a str>,
+    ca_cert: Option<&'a str>,
+}
+
 async fn location_writes(
     cluster: &dyn Cluster,
     objects: &Objects,
     request: &v::LocationRequest,
-    keys: Option<(&str, &str)>,
-    destination: Option<&str>,
+    given: Given<'_>,
     versions: &mut BTreeMap<String, String>,
 ) -> Result<Vec<Planned>, ApiError> {
+    let (keys, destination) = (given.keys, given.destination);
     if let Some(problem) = v::location_problem(request) {
         return Err(invalid(problem));
     }
@@ -951,6 +967,9 @@ async fn location_writes(
             shown,
         });
     }
+    if let Some(pem) = given.ca_cert.map(str::trim).filter(|pem| !pem.is_empty()) {
+        writes.push(ca_write(cluster, namespace, pem, versions).await?);
+    }
     let name = current
         .as_ref()
         .and_then(|c| c.pointer("/metadata/name"))
@@ -976,6 +995,47 @@ async fn location_writes(
         after,
     ));
     Ok(writes)
+}
+
+/// Writes the CA certificates into [`v::CA`], creating it or replacing its value. They are not
+/// secret, so the plan shows them.
+async fn ca_write(
+    cluster: &dyn Cluster,
+    namespace: &str,
+    pem: &str,
+    versions: &mut BTreeMap<String, String>,
+) -> Result<Planned, ApiError> {
+    let existing = cluster
+        .find_object(&secrets(), Some(namespace), v::CA)
+        .await
+        .map_err(|e| {
+            read_problem(
+                e,
+                &format!("Secret {} in {namespace}", v::CA),
+                get_read("", "secrets", Some(namespace), v::CA),
+            )
+        })?
+        .map(|s| value(&s))
+        .transpose()?;
+    versions.insert(format!("Secret/{}", v::CA), version(existing.as_ref()));
+    let shown = value(&v::ca_secret(namespace, pem))?;
+    let (body, action) = existing.as_ref().map_or_else(
+        || (WriteBody::Create(shown.clone()), BackupWriteAction::Create),
+        |existing| {
+            let patch = json!([
+                {"op": "test", "path": "/metadata/resourceVersion", "value": version(Some(existing))},
+                {"op": "add", "path": "/stringData", "value": { v::CA_KEY: pem }},
+            ]);
+            (WriteBody::JsonPatch(patch), BackupWriteAction::Patch)
+        },
+    );
+    Ok(Planned {
+        target: target("Secret", namespace, v::CA),
+        body,
+        action,
+        before: None,
+        shown,
+    })
 }
 
 /// Creates the SSE-C key of a new location when it does not exist. An existing key stays, because
@@ -1412,11 +1472,31 @@ async fn compute(
             access_key_id,
             secret_access_key,
             destination,
+            ca_cert,
         } => {
             let copied = match destination {
                 Some(name) => Some(s3_destinations::keys(cluster, name).await?),
                 None => None,
             };
+            let ca_cert = match destination {
+                Some(name) => {
+                    let (pem, from) = s3_destinations::ca_cert(cluster, name).await?;
+                    // The trust root applied must be the one the plan showed.
+                    versions.insert(
+                        format!("ConfigMap/{}/{name}", s3_destinations::NAMESPACE),
+                        from,
+                    );
+                    Some(pem)
+                }
+                None => ca_cert.clone(),
+            };
+            if ca_cert
+                .as_deref()
+                .map(str::trim)
+                .is_some_and(|pem| !pem.is_empty() && !is_ca_bundle(pem))
+            {
+                return Err(invalid(s3_destinations::CA_PROBLEM.to_owned()));
+            }
             let keys = match (access_key_id.trim(), secret_access_key.trim()) {
                 _ if copied.is_some() => copied.as_ref().map(|(a, s)| (a.as_str(), s.as_str())),
                 ("", "") => None,
@@ -1434,13 +1514,17 @@ async fn compute(
                 prefix: prefix.clone(),
                 region: region.clone(),
                 endpoint: endpoint.clone(),
+                ca: ca_cert.as_ref().map(|pem| !pem.trim().is_empty()),
             };
             location_writes(
                 cluster,
                 objects,
                 &location,
-                keys,
-                destination.as_deref(),
+                Given {
+                    keys,
+                    destination: destination.as_deref(),
+                    ca_cert: ca_cert.as_deref(),
+                },
                 &mut versions,
             )
             .await?
@@ -1851,6 +1935,7 @@ mod tests {
             access_key_id: "AKIA".to_owned(),
             secret_access_key: "S3CR3T".to_owned(),
             destination: None,
+            ca_cert: None,
         };
         assert!(!format!("{request:?}").contains("S3CR3T"));
     }

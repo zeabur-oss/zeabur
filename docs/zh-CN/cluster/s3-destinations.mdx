@@ -52,6 +52,7 @@ description: 添加 S3 存储位置，供数据库、K8up 和 Velero 备份选�
 | **文件夹** | 选填，备份会存放在这个路径下，不能包含空格或 `..`。 |
 | **区域** | 存储服务需要时填写。 |
 | **访问密钥 ID**、**私密访问密钥** | 新增时两项都要填写。 |
+| **CA 证书** | 可选。端点的证书由私有 CA 签发时（例如自建的 MinIO），粘贴 PEM 格式的 CA 证书。由公共 CA 签发时留空。集群备份会信任这个 CA，数据库和卷备份暂时不会用到。 |
 
 ![新增 S3 目的地的表单，填写了 Backblaze B2 的端点、存储桶和密钥](../images/shots/s3-destination-add.avif)
 
@@ -99,7 +100,7 @@ description: 添加 S3 存储位置，供数据库、K8up 和 Velero 备份选�
 
 ## 用 kubectl 完成相同操作
 
-一个目的地由 `zeabur-s3-destinations` Namespace 中两个同名的对象组成：ConfigMap 存放端点、存储桶、区域和文件夹，Secret 存放密钥。两个对象都要带有 label `zeabur.com/s3-destination: <名称>`，Zeabur 开源版才会列入列表。`region` 和 `prefix` 没有值时可以省略。
+一个目的地由 `zeabur-s3-destinations` Namespace 中两个同名的对象组成：ConfigMap 存放端点、存储桶、区域和文件夹，Secret 存放密钥。两个对象都要带有 label `zeabur.com/s3-destination: <名称>`，Zeabur 开源版才会列入列表。`region` 和 `prefix` 没有值时可以省略。可选的 `caCert` 键存放 PEM 格式的 CA 证书。
 
 ```yaml
 apiVersion: v1
