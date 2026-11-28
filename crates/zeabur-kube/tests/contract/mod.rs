@@ -4,12 +4,15 @@
 //! suite is what makes that trust checked rather than assumed [swe-doubles].
 //!
 //! Each behaviour takes a [`Cluster`] acting as a person who may get, create and patch
-//! ConfigMaps and Deployments, and delete ConfigMaps, in `namespace`, which starts empty. The
-//! Secret behaviour also needs `get`, `list` and `create` on Secrets.
+//! ConfigMaps and Deployments, and list, watch and delete ConfigMaps, in `namespace`, which starts
+//! empty. The Secret behaviour also needs `get`, `list` and `create` on Secrets.
 //!
 //! [swe-doubles]: https://abseil.io/resources/swe-book/html/ch13.html
 
+use std::time::Duration;
+
 use base64::Engine as _;
+use futures_util::StreamExt as _;
 use serde_json::{Value, json};
 use zeabur_core::problem::KubernetesStatus;
 use zeabur_kube::{
@@ -390,6 +393,51 @@ pub(crate) async fn of_concurrent_patches_of_one_version_exactly_one_is_stored(
     );
     let after = stored(cluster, &settings).await;
     assert_eq!(text(&after, "/data/a"), format!("plan {}", winners[0]));
+}
+
+/// Given a ConfigMap and a watch of it, when it is patched and then deleted, then the watch
+/// shows it as it was, then as patched, then gone.
+pub(crate) async fn a_watch_follows_an_object_until_it_is_deleted(
+    cluster: &impl Cluster,
+    namespace: &str,
+) {
+    let settings = config_map(namespace, "settings");
+    new_config_map(cluster, &settings, json!({"a": "1"})).await;
+    let resource = settings.resource();
+    let mut states = cluster.watch_object(
+        &resource,
+        settings.namespace(),
+        &settings.name,
+        Duration::from_secs(60),
+    );
+    let mut next = async || {
+        tokio::time::timeout(Duration::from_secs(30), states.next())
+            .await
+            .expect("a state within 30 s")
+            .expect("the watch goes on")
+            .expect("a state")
+            .map(|object| serde_json::to_value(object).expect("JSON"))
+    };
+    let first = next().await.expect("the ConfigMap");
+    assert_eq!(text(&first, "/data/a"), "1");
+    cluster
+        .write(&patch(
+            &settings,
+            json!([{"op": "replace", "path": "/data/a", "value": "2"}]),
+        ))
+        .await
+        .expect("patch the ConfigMap");
+    let patched = next().await.expect("the patched ConfigMap");
+    assert_eq!(text(&patched, "/data/a"), "2");
+    cluster
+        .write(&write(
+            &settings,
+            WriteBody::Delete(Preconditions::default()),
+            false,
+        ))
+        .await
+        .expect("delete the ConfigMap");
+    assert_eq!(next().await, None);
 }
 
 /// Given a ConfigMap, when it is deleted with a `uid` or `resourceVersion` precondition it no

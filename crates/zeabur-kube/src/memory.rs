@@ -30,8 +30,8 @@ use crate::objects::{AccessRule, AccessRules, ResourceRef, ServedResource, hide_
 use crate::port::{
     Answer, Cluster, ClusterError, ClusterEvents, ClusterFacts, ClusterPods, ExecRequest,
     ExecSession, ExecStream, ExitStatus, Identity, IssuedToken, LogLines, LogOptions,
-    NamespaceObjects, ObjectTarget, Preconditions, RawList, SecretSummary, ServicePort,
-    TerminalSize, Unreadable, WriteBody, WriteRequest, Written,
+    NamespaceObjects, ObjectStates, ObjectTarget, Preconditions, RawList, SecretSummary,
+    ServicePort, TerminalSize, Unreadable, WriteBody, WriteRequest, Written,
 };
 
 /// What the in-memory cluster holds.
@@ -180,6 +180,8 @@ pub type ProxyAnswer = fn(&str) -> Result<Value, KubernetesStatus>;
 #[derive(Debug, Clone, Default)]
 pub struct MemoryCluster {
     state: Arc<Mutex<State>>,
+    /// Sent after every write and [`MemoryCluster::update`], for [`Cluster::watch_object`].
+    changed: tokio::sync::watch::Sender<()>,
 }
 
 fn forbidden(what: &str) -> ClusterError {
@@ -566,6 +568,7 @@ impl MemoryCluster {
     pub fn new(state: State) -> Self {
         Self {
             state: Arc::new(Mutex::new(state)),
+            changed: tokio::sync::watch::Sender::default(),
         }
     }
 
@@ -574,6 +577,7 @@ impl MemoryCluster {
         if let Ok(mut state) = self.state.lock() {
             change(&mut state);
         }
+        self.changed.send_replace(());
     }
 
     /// Reads the state.
@@ -1215,6 +1219,36 @@ impl Cluster for MemoryCluster {
         })
     }
 
+    /// The object as [`ClusterExt::find_object`] reads it, again after each change, until
+    /// `timeout` passes.
+    fn watch_object<'a>(
+        &'a self,
+        resource: &'a ResourceRef,
+        namespace: Option<&'a str>,
+        name: &'a str,
+        timeout: std::time::Duration,
+    ) -> ObjectStates<'a> {
+        let deadline = tokio::time::Instant::now() + timeout;
+        let changed = self.changed.subscribe();
+        Box::pin(futures_util::stream::unfold(
+            (changed, true, false),
+            move |(mut changed, first, ended)| async move {
+                if ended {
+                    return None;
+                }
+                if !first {
+                    tokio::time::timeout_at(deadline, changed.changed())
+                        .await
+                        .ok()?
+                        .ok()?;
+                }
+                let state = crate::ClusterExt::find_object(self, resource, namespace, name).await;
+                let ended = state.is_err();
+                Some((state, (changed, false, ended)))
+            },
+        ))
+    }
+
     // ── Writes ───────────────────────────────────────────────────────────────────────────────
 
     /// Writes as kube-apiserver does, as far as Zeabur's writes reach (checked against k3s by the
@@ -1258,6 +1292,7 @@ impl Cluster for MemoryCluster {
             if let WriteBody::Delete(preconditions) = &request.body {
                 state.delete(request, current, preconditions)?;
                 drop(state);
+                self.changed.send_replace(());
                 return Ok(Written {
                     resource_version: version,
                     generation: None,
@@ -1340,6 +1375,7 @@ impl Cluster for MemoryCluster {
             state.store(target, object.clone())?;
             state.writes.push(request.clone());
             drop(state);
+            self.changed.send_replace(());
             Ok(Written {
                 resource_version: Some(next),
                 generation,

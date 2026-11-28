@@ -40,6 +40,7 @@ pub mod port;
 #[cfg(feature = "memory")]
 pub mod recording;
 mod secrets;
+mod watch;
 mod wide;
 mod write;
 
@@ -52,8 +53,8 @@ pub use port::{
     Answer, Cluster, ClusterError, ClusterEvents, ClusterExt, ClusterFacts, ClusterPod,
     ClusterPods, ContainerResources, ExecRequest, ExecSession, ExecStream, ExitStatus,
     FIELD_MANAGER, GatewayRef, Identity, IssuedToken, LogLines, LogOptions, NamespaceObjects,
-    ObjectTarget, Preconditions, RawList, Resize, SecretSummary, ServicePort, TerminalSize,
-    Unreadable, WriteBody, WriteRequest, Written,
+    ObjectStates, ObjectTarget, Preconditions, RawList, Resize, SecretSummary, ServicePort,
+    TerminalSize, Unreadable, WriteBody, WriteRequest, Written,
 };
 use secrecy::{ExposeSecret as _, SecretString};
 

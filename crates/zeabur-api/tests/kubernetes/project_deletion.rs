@@ -88,7 +88,7 @@ async fn a_project_with_a_database_goes_away() {
             {"apiGroups": ["", "apps", "batch", "networking.k8s.io", "events.k8s.io"],
              "resources": ["*"], "verbs": ["get", "list"]},
             {"apiGroups": ["postgresql.cnpg.io"], "resources": ["clusters"],
-             "verbs": ["get", "list", "delete"]},
+             "verbs": ["get", "list", "watch", "delete"]},
             {"apiGroups": [""], "resources": ["namespaces"], "verbs": ["get", "delete"]}
         ]),
     )

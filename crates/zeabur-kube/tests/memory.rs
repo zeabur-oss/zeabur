@@ -54,6 +54,11 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_watch_follows_an_object_until_it_is_deleted() {
+        contract::a_watch_follows_an_object_until_it_is_deleted(&cluster(), NAMESPACE).await;
+    }
+
+    #[tokio::test]
     async fn a_deletion_keeps_to_its_preconditions() {
         contract::a_deletion_keeps_to_its_preconditions(&cluster(), NAMESPACE).await;
     }

@@ -22,6 +22,7 @@ use std::time::Duration;
 use axum::extract::State;
 use axum::http::{HeaderName, HeaderValue, header};
 use axum::response::Response;
+use futures_util::StreamExt as _;
 use serde_json::Value;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::{Cluster, ClusterExt as _, ObjectTarget, WriteBody, WriteRequest};
@@ -37,7 +38,6 @@ use crate::handlers::{AppState, Person};
 
 /// How long Velero may take to sign the URL.
 const SIGNING: Duration = Duration::from_secs(30);
-const POLL: Duration = Duration::from_millis(500);
 /// The most bytes read of a backup's list of objects, unpacked.
 const LIST_BYTES: usize = 16 << 20;
 /// The most bytes read of a backup's archive, packed and unpacked.
@@ -65,25 +65,27 @@ async fn signed_url(
     namespace: &str,
     name: &str,
 ) -> Result<String, ApiError> {
-    let deadline = tokio::time::Instant::now() + SIGNING;
-    loop {
-        let signed = cluster
-            .find_object(&request.resource(), Some(namespace), name)
-            .await
-            .ok()
-            .flatten()
-            .and_then(|o| v::download_url(&o));
-        if let Some((url, _)) = signed {
+    let resource = request.resource();
+    let mut states = cluster
+        .watch_object(&resource, Some(namespace), name, SIGNING)
+        .enumerate();
+    while let Some((i, state)) = states.next().await {
+        // The first state comes from the LIST the watch starts with.
+        let verb = if i == 0 { "list" } else { "watch" };
+        let state = state.map_err(|e| {
+            read_problem(
+                e,
+                &format!("DownloadRequest {name} in {namespace}"),
+                super::backups::right(verb, "downloadrequests", namespace, None),
+            )
+        })?;
+        if let Some((url, _)) = state.as_ref().and_then(v::download_url) {
             return Ok(url);
         }
-        if tokio::time::Instant::now() >= deadline {
-            return Err(bad_gateway(
-                "Velero did not prepare the download in time; check that its server runs."
-                    .to_owned(),
-            ));
-        }
-        tokio::time::sleep(POLL).await;
     }
+    Err(bad_gateway(
+        "Velero did not prepare the download in time; check that its server runs.".to_owned(),
+    ))
 }
 
 /// The headers that read objects the location encrypts with a customer key, read as the person;

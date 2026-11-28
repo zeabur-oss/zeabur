@@ -1081,6 +1081,34 @@ mod tests {
         );
     }
 
+    /// A person who may create a `DownloadRequest` but not read it back is told the `list` they
+    /// miss, the request the watch starts with.
+    #[tokio::test]
+    async fn a_download_request_that_cannot_be_read_names_the_list_it_needs() {
+        let cluster = velero(vec![
+            location(),
+            schedule(),
+            backup("zeabur-1", "Completed"),
+        ]);
+        cluster.update(|s| {
+            s.forbidden_in_namespaces
+                .insert("downloadrequests.velero.io".to_owned());
+        });
+        let (status, problem) = send(
+            &app(&cluster),
+            "GET",
+            "/api/v1/cluster/backups/zeabur-1/download",
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+        assert_eq!(problem["denied"]["verb"], "list", "{problem}");
+        assert_eq!(
+            problem["denied"]["resource"], "downloadrequests",
+            "{problem}"
+        );
+    }
+
     #[tokio::test]
     async fn a_refused_read_is_not_velero_missing() {
         let cluster = velero(vec![location(), schedule()]);
