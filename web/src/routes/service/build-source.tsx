@@ -350,7 +350,7 @@ function UploadSource({
   const [tried, setTried] = useState(false)
   const ready = folder.state.phase === "ready" ? folder.state : undefined
   const [chosen, setChosen] = useState<BuildMethod>()
-  const method = chosen ?? folderMethod(build, (path) => ready?.dockerfiles.has(path) ?? false)
+  const method = chosen ?? folderMethod(build, (path) => ready?.dockerfiles?.has(path) ?? false)
   const planner = usePlanStep(project, onClose, () => {
     if (ready)
       void startUpload({ project, build: service.name, blob: ready.packed.blob, request, t })

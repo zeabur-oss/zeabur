@@ -61,7 +61,7 @@ description: 连接 Git 仓库、完成首次构建，并选择新镜像何时�
 - **环境变量**：容器运行时读取，每行一个 `KEY=value`。
 - **构建变量**：仅在构建阶段使用，例如下载私有包的令牌。变量值通过 BuildKit secret 传入，不会留在镜像中。Dockerfile 使用 `RUN --mount=type=secret,id=KEY` 读取。
 - **规格**：服务运行时的 CPU 和内存。
-- **安全性**：Railpack 镜像以 UID 1000 运行，默认选择**严格**；Dockerfile 默认选择**兼容**。Agent 默认选择**兼容**，因为仓库可能有自己的 Dockerfile，Agent 会直接用它构建。上传的文件夹没有 Dockerfile 时，默认选择**严格**：模型写的 Dockerfile 如果让镜像以 root 运行，Zeabur Builder 不会采用。创建前仍可切换。使用 Dockerfile 构建并选择严格模式时，需要用数字 UID 指定非 root 用户，例如 `USER 1000`。
+- **安全性**：Railpack 镜像以 UID 1000 运行，默认选择**严格**；Dockerfile 默认选择**兼容**。Agent 默认选择**兼容**，因为仓库可能有自己的 Dockerfile，Agent 会直接用它构建。上传的文件夹或 ZIP 文件没有 Dockerfile 时，默认选择**严格**：模型写的 Dockerfile 如果让镜像以 root 运行，Zeabur Builder 不会采用。创建前仍可切换。使用 Dockerfile 构建并选择严格模式时，需要用数字 UID 指定非 root 用户，例如 `USER 1000`。
 
 </Step>
 <Step>

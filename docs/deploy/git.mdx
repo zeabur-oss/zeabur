@@ -61,7 +61,7 @@ Under **More settings**, configure these separately:
 - **Environment variables**: Read by the container at runtime. Enter one `KEY=value` per line.
 - **Build variables**: Used only during the build, such as a token for downloading private packages. Values are passed as BuildKit secrets and aren't stored in the image. In a Dockerfile, read them with `RUN --mount=type=secret,id=KEY`.
 - **Size**: CPU and memory for the running service.
-- **Security**: Railpack images run as UID 1000 and default to **Strict**. Dockerfile builds default to **Compatible**. Agent builds default to **Compatible**, because the repository may have its own Dockerfile, which the agent builds as it is. An uploaded folder with no Dockerfile defaults to **Strict**: Zeabur Builder refuses a Dockerfile the model writes if its image runs as root. You can change this before creating the service. When building with a Dockerfile and choosing Strict, specify a non-root user with a numeric UID, such as `USER 1000`.
+- **Security**: Railpack images run as UID 1000 and default to **Strict**. Dockerfile builds default to **Compatible**. Agent builds default to **Compatible**, because the repository may have its own Dockerfile, which the agent builds as it is. An uploaded folder or ZIP file with no Dockerfile defaults to **Strict**: Zeabur Builder refuses a Dockerfile the model writes if its image runs as root. You can change this before creating the service. When building with a Dockerfile and choosing Strict, specify a non-root user with a numeric UID, such as `USER 1000`.
 
 </Step>
 <Step>
