@@ -23,6 +23,7 @@ base64.workspace = true
 bcrypt.workspace = true
 json-patch.workspace = true
 k8s-openapi.workspace = true
+zeabur-builder-api.workspace = true
 serde.workspace = true
 # YAML edits; already in the binary through zeabur-catalog.
 serde-saphyr.workspace = true

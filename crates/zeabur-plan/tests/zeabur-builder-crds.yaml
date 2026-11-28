@@ -1,4 +1,4 @@
-# zeabur-oss/builder v0.3.0 deploy/chart/crds/crds.yaml, copied by scripts/builder-crds.sh
+# zeabur-oss/builder v0.3.1 deploy/chart/crds/crds.yaml, copied by scripts/builder-crds.sh
 ---
 {
   "apiVersion": "apiextensions.k8s.io/v1",
@@ -161,12 +161,74 @@
                                 ],
                                 "type": "object"
                               },
+                              "tokenExchange": {
+                                "description": "The token endpoint, its form, and the service account whose token the run exchanges.",
+                                "properties": {
+                                  "audience": {
+                                    "description": "The audience of the projected service account token, such as\n`api://AzureADTokenExchange`.",
+                                    "maxLength": 2048,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "form": {
+                                    "additionalProperties": {
+                                      "maxLength": 1024,
+                                      "type": "string"
+                                    },
+                                    "description": "The other form fields, sent as they are. The `ClusterBuilder` is not a Secret: put no\nsecret here.",
+                                    "maxProperties": 16,
+                                    "type": "object",
+                                    "x-kubernetes-validations": [
+                                      {
+                                        "message": "a form field name is at most 128 characters",
+                                        "rule": "self.all(k, size(k) <= 128)"
+                                      }
+                                    ]
+                                  },
+                                  "serviceAccountName": {
+                                    "description": "The Kubernetes service account, in each `Build`'s own namespace, whose token the run\nexchanges.",
+                                    "maxLength": 253,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "subjectField": {
+                                    "description": "The form field that carries the service account token, such as `client_assertion` or\n`subject_token`.",
+                                    "maxLength": 128,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "url": {
+                                    "description": "The token endpoint, `https://…`.",
+                                    "maxLength": 2048,
+                                    "minLength": 1,
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "audience",
+                                  "serviceAccountName",
+                                  "subjectField",
+                                  "url"
+                                ],
+                                "type": "object",
+                                "x-kubernetes-validations": [
+                                  {
+                                    "message": "url must start with https://",
+                                    "rule": "self.url.startsWith('https://')"
+                                  },
+                                  {
+                                    "message": "form must not hold subjectField",
+                                    "rule": "!has(self.form) || !(self.subjectField in self.form)"
+                                  }
+                                ]
+                              },
                               "type": {
-                                "description": "`apiKey`: An API key in a Secret.\n\n`anthropicFederation`: Anthropic's workload identity federation: a service account token for a short-lived\naccess token.\n\n`openaiFederation`: OpenAI's workload identity federation: a service account token for a short-lived access\ntoken.",
+                                "description": "`apiKey`: An API key in a Secret.\n\n`anthropicFederation`: Anthropic's workload identity federation: a service account token for a short-lived\naccess token.\n\n`openaiFederation`: OpenAI's workload identity federation: a service account token for a short-lived access\ntoken.\n\n`tokenExchange`: A token endpoint that takes a service account token in one form field and returns a\nshort-lived access token.",
                                 "enum": [
                                   "apiKey",
                                   "anthropicFederation",
-                                  "openaiFederation"
+                                  "openaiFederation",
+                                  "tokenExchange"
                                 ],
                                 "type": "string"
                               }
@@ -187,6 +249,10 @@
                               {
                                 "message": "openaiFederation is required for type openaiFederation, and only for it",
                                 "rule": "has(self.openaiFederation) == (self.type == 'openaiFederation')"
+                              },
+                              {
+                                "message": "tokenExchange is required for type tokenExchange, and only for it",
+                                "rule": "has(self.tokenExchange) == (self.type == 'tokenExchange')"
                               }
                             ]
                           },
@@ -236,15 +302,17 @@
                             "properties": {
                               "cpu": {
                                 "description": "CPU, such as `500m`.",
-                                "maxLength": 32,
+                                "maxLength": 64,
                                 "nullable": true,
-                                "type": "string"
+                                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                "x-kubernetes-int-or-string": true
                               },
                               "memory": {
                                 "description": "Memory, such as `1Gi`.",
-                                "maxLength": 32,
+                                "maxLength": 64,
                                 "nullable": true,
-                                "type": "string"
+                                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                "x-kubernetes-int-or-string": true
                               }
                             },
                             "type": "object"
@@ -255,15 +323,17 @@
                             "properties": {
                               "cpu": {
                                 "description": "CPU, such as `500m`.",
-                                "maxLength": 32,
+                                "maxLength": 64,
                                 "nullable": true,
-                                "type": "string"
+                                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                "x-kubernetes-int-or-string": true
                               },
                               "memory": {
                                 "description": "Memory, such as `1Gi`.",
-                                "maxLength": 32,
+                                "maxLength": 64,
                                 "nullable": true,
-                                "type": "string"
+                                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                "x-kubernetes-int-or-string": true
                               }
                             },
                             "type": "object"
@@ -348,15 +418,17 @@
                             "properties": {
                               "cpu": {
                                 "description": "CPU, such as `500m`.",
-                                "maxLength": 32,
+                                "maxLength": 64,
                                 "nullable": true,
-                                "type": "string"
+                                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                "x-kubernetes-int-or-string": true
                               },
                               "memory": {
                                 "description": "Memory, such as `1Gi`.",
-                                "maxLength": 32,
+                                "maxLength": 64,
                                 "nullable": true,
-                                "type": "string"
+                                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                "x-kubernetes-int-or-string": true
                               }
                             },
                             "type": "object"
@@ -367,15 +439,17 @@
                             "properties": {
                               "cpu": {
                                 "description": "CPU, such as `500m`.",
-                                "maxLength": 32,
+                                "maxLength": 64,
                                 "nullable": true,
-                                "type": "string"
+                                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                "x-kubernetes-int-or-string": true
                               },
                               "memory": {
                                 "description": "Memory, such as `1Gi`.",
-                                "maxLength": 32,
+                                "maxLength": 64,
                                 "nullable": true,
-                                "type": "string"
+                                "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                                "x-kubernetes-int-or-string": true
                               }
                             },
                             "type": "object"
@@ -434,13 +508,15 @@
                         "description": "`--buildkitd-cpu-max`; missing: no ceiling.",
                         "maxLength": 64,
                         "nullable": true,
-                        "type": "string"
+                        "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                        "x-kubernetes-int-or-string": true
                       },
                       "memory": {
                         "description": "`--buildkitd-memory-max`; missing: no ceiling.",
                         "maxLength": 64,
                         "nullable": true,
-                        "type": "string"
+                        "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                        "x-kubernetes-int-or-string": true
                       }
                     },
                     "type": "object"
@@ -457,13 +533,15 @@
                             "description": "CPU, such as `100m` or `1`.",
                             "maxLength": 64,
                             "nullable": true,
-                            "type": "string"
+                            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                            "x-kubernetes-int-or-string": true
                           },
                           "memory": {
                             "description": "Memory, such as `256Mi`.",
                             "maxLength": 64,
                             "nullable": true,
-                            "type": "string"
+                            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                            "x-kubernetes-int-or-string": true
                           }
                         },
                         "type": "object"
@@ -476,13 +554,15 @@
                             "description": "CPU, such as `100m` or `1`.",
                             "maxLength": 64,
                             "nullable": true,
-                            "type": "string"
+                            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                            "x-kubernetes-int-or-string": true
                           },
                           "memory": {
                             "description": "Memory, such as `256Mi`.",
                             "maxLength": 64,
                             "nullable": true,
-                            "type": "string"
+                            "pattern": "^(\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\\+|-)?(([0-9]+(\\.[0-9]*)?)|(\\.[0-9]+))))?$",
+                            "x-kubernetes-int-or-string": true
                           }
                         },
                         "type": "object"

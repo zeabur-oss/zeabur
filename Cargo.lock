@@ -560,6 +560,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed17f5901b6630b993ca003def43f2f8ef4014fc13b047b57aad617ff32bc2ec"
+dependencies = [
+ "darling_core",
+ "darling_macro",
+]
+
+[[package]]
+name = "darling_core"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6837e2cf7485aaae18f86181d2f0e9a7ed297a025e220aeabf63fdebd3a2ddff"
+dependencies = [
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "syn 3.0.10",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.24.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ac7135c3ef02b2f7833bbeb1be5ba7f966dcde8a87c6b87f65a778d71a02785"
+dependencies = [
+ "darling_core",
+ "quote",
+ "syn 3.0.10",
+]
+
+[[package]]
 name = "data-encoding"
 version = "2.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1043,6 +1077,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ident_case"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
+
+[[package]]
 name = "indexmap"
 version = "2.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1309,6 +1349,20 @@ dependencies = [
  "serde-value",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "kube-derive"
+version = "5.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cedc991dbe7757a646098dead35e070e13ce66e2996b02162ac7f97eb97f4d6e"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn 3.0.10",
 ]
 
 [[package]]
@@ -2887,6 +2941,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeabur-builder-api"
+version = "0.3.1"
+source = "git+https://github.com/zeabur-oss/builder?tag=v0.3.1#f6b7cffdb66fdaf2aea6ef25f547d747d7a22a0e"
+dependencies = [
+ "jiff",
+ "k8s-openapi",
+ "kube",
+ "kube-derive",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "zeabur-catalog"
 version = "0.3.3"
 dependencies = [
@@ -3057,6 +3124,7 @@ dependencies = [
  "serde-saphyr",
  "serde_json",
  "utoipa",
+ "zeabur-builder-api",
  "zeabur-graph",
  "zeabur-kube",
  "zeabur-model",
@@ -3080,6 +3148,7 @@ dependencies = [
  "sha2",
  "thiserror",
  "utoipa",
+ "zeabur-builder-api",
  "zeabur-graph",
  "zeabur-model",
  "zeabur-test-support",
