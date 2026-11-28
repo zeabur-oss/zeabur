@@ -2458,6 +2458,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "kube-derive"
+version = "5.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cedc991dbe7757a646098dead35e070e13ce66e2996b02162ac7f97eb97f4d6e"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn 3.0.10",
+]
+
+[[package]]
 name = "libappindicator"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6365,6 +6379,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeabur-builder-api"
+version = "0.3.1"
+source = "git+https://github.com/zeabur-oss/builder?tag=v0.3.1#f6b7cffdb66fdaf2aea6ef25f547d747d7a22a0e"
+dependencies = [
+ "jiff",
+ "k8s-openapi",
+ "kube",
+ "kube-derive",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "zeabur-catalog"
 version = "0.3.3"
 dependencies = [
@@ -6545,6 +6572,7 @@ dependencies = [
  "serde",
  "serde_json",
  "utoipa",
+ "zeabur-builder-api",
  "zeabur-kube",
  "zeabur-model",
 ]
@@ -6563,6 +6591,7 @@ dependencies = [
  "sha2 0.11.1",
  "thiserror 2.0.21",
  "utoipa",
+ "zeabur-builder-api",
  "zeabur-graph",
  "zeabur-model",
 ]

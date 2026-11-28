@@ -21,22 +21,25 @@
 //! token; the client uploads the folder after the plan.
 //!
 //! When Zeabur has a public URL, the `Build` that [`crate::Change::CreateBuiltService`] or
-//! [`crate::Change::SetBuild`] writes carries [`DETAILS_URL`]: the service's Builds tab, which
+//! [`crate::Change::SetBuild`] writes carries [`annotations::DETAILS_URL`]: the service's Builds tab, which
 //! Zeabur Builder links its commit statuses to.
 
 use std::collections::BTreeMap;
 
-use k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, Secret, SecretKeySelector};
+use k8s_openapi::api::core::v1::Secret;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use zeabur_builder_api::build::{
+    ArchiveSource, Build, BuildSpec, Concurrency, EnvVar, EnvVarSource, GitHubAppSource, GitSource,
+    NotifyTarget, NotifyType, OutputSpec, SourceKind, SourceSpec, TriggerSpec,
+};
+use zeabur_builder_api::common::{SecretKeyRef, SecretRef};
+use zeabur_builder_api::{annotations, labels};
 use zeabur_graph::Workload;
 use zeabur_model::{ImageUpdates, PodSecurityLevel, UpdateSetting, WorkloadKind, WorkloadRef};
 
-use crate::builds::{
-    BUILDER_GROUP, BUILDER_VERSION, DETAILS_URL, GIT_CREDENTIALS_LABEL, KEEL_FORCE, KEEL_POLICY,
-    UPLOAD_TOKEN_REQUEST, build_path, builds,
-};
+use crate::builds::{KEEL_FORCE, KEEL_POLICY, build_path, builds};
 use crate::change::{BuildMethod, DataEdit, DataKind, NameValue, ServiceSize, Update};
 use crate::checks::ResourceRef;
 use crate::fields::Step;
@@ -397,161 +400,48 @@ fn check_git(url: &str, branch: Option<&str>, access: &GitAccess) -> Result<Repo
     Ok(repository)
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Build {
-    api_version: String,
-    kind: &'static str,
-    metadata: ObjectMeta,
-    spec: BuildSpec,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct BuildSpec {
-    builder_ref: &'static str,
-    source: SourceSpec,
-    output: BuildOutput,
-    notify: [BuildNotify; 1],
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    env: Vec<EnvVar>,
-}
-
-/// `spec.source`, as Zeabur Builder's `SourceSpec` (`crates/zeabur-builder-api/src/build.rs` at
-/// the tag in `xtask/pins/zeabur-builder`).
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SourceSpec {
-    #[serde(flatten)]
-    kind: SourceKind,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    context_dir: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    dockerfile: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
-enum SourceKind {
-    Git { git: GitSource },
-    Archive { archive: ArchiveSource },
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GitSource {
-    url: String,
-    #[serde(rename = "ref")]
-    reference: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    credentials_ref: Option<NameRef>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    github_app: Option<GitHubApp>,
-}
-
-/// An uploaded archive. The client uploads it after the plan and names its digest then.
-#[derive(Serialize)]
-struct ArchiveSource {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    digest: Option<String>,
-}
-
-#[derive(Serialize)]
-struct NameRef {
-    name: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GitHubApp {
-    installation_id: u64,
-}
-
-#[derive(Serialize)]
-struct BuildOutput {
-    image: String,
-}
-
-#[derive(Serialize)]
-struct BuildNotify {
-    #[serde(rename = "type")]
-    kind: &'static str,
-    url: &'static str,
-}
-
-/// The fields of a `Build` the plan reads.
-#[derive(Default, Deserialize)]
-#[serde(default)]
-struct BuildRead {
-    spec: SpecRead,
-    status: StatusRead,
-}
-
-#[derive(Default, Deserialize)]
-#[serde(default)]
-struct SpecRead {
-    source: SourceRead,
-    output: OutputRead,
-}
-
-#[derive(Default, Deserialize)]
-#[serde(default)]
-struct SourceRead {
-    #[serde(rename = "type")]
-    kind: String,
-    git: Option<GitRead>,
-    archive: Option<ArchiveRead>,
-}
-
-#[derive(Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct GitRead {
-    credentials_ref: Option<NameRead>,
-}
-
-#[derive(Default, Deserialize)]
-#[serde(default)]
-struct NameRead {
-    name: String,
-}
-
-#[derive(Default, Deserialize)]
-#[serde(default)]
-struct ArchiveRead {
-    digest: Option<String>,
-}
-
-#[derive(Default, Deserialize)]
-#[serde(default)]
-struct OutputRead {
-    image: Option<String>,
-}
-
-#[derive(Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct StatusRead {
-    latest_image: Option<String>,
-}
+/// A `Build` the plan read.
+#[derive(Deserialize)]
+#[serde(transparent)]
+struct BuildRead(Build);
 
 impl BuildRead {
     /// The repository it pushes to: `spec.output.image`, else its newest image's.
     fn repository(&self) -> Option<&str> {
-        self.spec
+        self.pushes_to().or_else(|| {
+            self.0
+                .status
+                .as_ref()
+                .and_then(|s| s.latest_image.as_deref())
+                .map(repository_of)
+        })
+    }
+
+    /// `spec.output.image`, when set.
+    fn pushes_to(&self) -> Option<&str> {
+        self.0
+            .spec
             .output
-            .image
-            .as_deref()
+            .as_ref()
+            .and_then(|o| o.image.as_deref())
             .filter(|i| !i.is_empty())
-            .or_else(|| self.status.latest_image.as_deref().map(repository_of))
     }
 
     /// The Secret it reads the repository's credentials from.
     fn credentials(&self) -> Option<&str> {
-        self.spec
+        self.0
+            .spec
             .source
-            .git
-            .as_ref()
-            .and_then(|g| g.credentials_ref.as_ref())
+            .credentials_ref()
             .map(|r| r.name.as_str())
+    }
+
+    /// Its uploaded folder, when it builds one.
+    const fn archive(&self) -> Option<&ArchiveSource> {
+        match &self.0.spec.source.kind {
+            SourceKind::Archive { archive } => Some(archive),
+            SourceKind::Git { .. } => None,
+        }
     }
 
     /// Whether a container of `spec`, init containers too, runs what it pushes.
@@ -595,7 +485,7 @@ fn credentials(
 ) -> Result<(Option<Secret>, GitSource), PlanError> {
     let secret_name = credentials_name(name);
     let mut labels = labels_of(name);
-    labels.insert(GIT_CREDENTIALS_LABEL.to_owned(), "true".to_owned());
+    labels.insert(labels::GIT_CREDENTIALS.to_owned(), "true".to_owned());
     let secret = |kind: &str, values: [(&str, &str); 2]| Secret {
         metadata: ObjectMeta {
             name: Some(secret_name.clone()),
@@ -617,8 +507,14 @@ fn credentials(
         GitAccess::GithubApp { installation_id } => (
             None,
             https,
-            Some(GitHubApp {
-                installation_id: *installation_id,
+            Some(GitHubAppSource {
+                installation_id: i64::try_from(*installation_id).map_err(|_too_large| {
+                    refused(
+                        "invalid_installation",
+                        "The GitHub App installation id is too large.",
+                        "build.source.installationId",
+                    )
+                })?,
             }),
         ),
         GitAccess::Token { username, token } => (
@@ -661,12 +557,12 @@ fn credentials(
     };
     let source = GitSource {
         url,
-        reference: branch
+        git_ref: branch
             .map(str::trim)
             .filter(|b| !b.is_empty())
             .unwrap_or(DEFAULT_BRANCH_REF)
             .to_owned(),
-        credentials_ref: secret.as_ref().map(|_| NameRef { name: secret_name }),
+        credentials_ref: secret.as_ref().map(|_| SecretRef { name: secret_name }),
         github_app,
     };
     Ok((secret, source))
@@ -720,7 +616,7 @@ impl BuildInput {
         let (kind, secret) = match &self.source {
             BuildSource::Upload { .. } => (
                 SourceKind::Archive {
-                    archive: ArchiveSource { digest: None },
+                    archive: ArchiveSource::default(),
                 },
                 None,
             ),
@@ -753,7 +649,7 @@ impl BuildInput {
     }
 
     /// The new `Build` `name` that builds `source` and pushes to `repository`, its variables read
-    /// from `<name>-build-env`, linked to `details` (see [`DETAILS_URL`]).
+    /// from `<name>-build-env`, linked to `details` (see [`annotations::DETAILS_URL`]).
     fn build(
         &self,
         name: &str,
@@ -769,44 +665,47 @@ impl BuildInput {
                 name: v.name.clone(),
                 value: None,
                 value_from: Some(EnvVarSource {
-                    secret_key_ref: Some(SecretKeySelector {
+                    secret_key_ref: SecretKeyRef {
                         name: secret.clone(),
                         key: v.name.clone(),
-                        optional: None,
-                    }),
-                    ..EnvVarSource::default()
+                    },
                 }),
             })
             .collect();
-        let annotations: BTreeMap<String, String> = match &self.source {
-            BuildSource::Upload { request } => {
-                Some((UPLOAD_TOKEN_REQUEST.to_owned(), request.clone()))
-            }
+        let notes: BTreeMap<String, String> = match &self.source {
+            BuildSource::Upload { request } => Some((
+                annotations::UPLOAD_TOKEN_REQUEST.to_owned(),
+                request.clone(),
+            )),
             BuildSource::Git { .. } => None,
         }
         .into_iter()
-        .chain(details.map(|url| (DETAILS_URL.to_owned(), url)))
+        .chain(details.map(|url| (annotations::DETAILS_URL.to_owned(), url)))
         .collect();
-        Build {
-            api_version: format!("{BUILDER_GROUP}/{BUILDER_VERSION}"),
-            kind: "Build",
-            metadata: ObjectMeta {
-                name: Some(name.to_owned()),
-                labels: Some(labels_of(name)),
-                annotations: (!annotations.is_empty()).then_some(annotations),
-                ..ObjectMeta::default()
-            },
-            spec: BuildSpec {
-                builder_ref: self.builder_ref(),
+        let mut build = Build::new(
+            name,
+            BuildSpec {
                 source,
-                output: BuildOutput { image: repository },
-                notify: [BuildNotify {
-                    kind: "keel",
-                    url: KEEL_WEBHOOK,
-                }],
+                builder_ref: self.builder_ref().to_owned(),
+                output: Some(OutputSpec {
+                    image: Some(repository),
+                    ..OutputSpec::default()
+                }),
                 env,
+                triggers: TriggerSpec::default(),
+                concurrency: Concurrency::default(),
+                history_limit: None,
+                notify: vec![NotifyTarget {
+                    kind: NotifyType::Keel,
+                    url: KEEL_WEBHOOK.to_owned(),
+                    secret_ref: None,
+                }],
+                suspend: false,
             },
-        }
+        );
+        build.metadata.labels = Some(labels_of(name));
+        build.metadata.annotations = (!notes.is_empty()).then_some(notes);
+        build
     }
 }
 
@@ -843,21 +742,21 @@ impl<'a> Planner<'a> {
         })
     }
 
-    /// Sets [`DETAILS_URL`] of the `Build` at `at` to `url`, unless it has that value.
+    /// Sets [`annotations::DETAILS_URL`] of the `Build` at `at` to `url`, unless it has that value.
     fn link_build(&mut self, at: usize, url: &str) -> Result<(), PlanError> {
         let current = self.current(at);
-        let path = pointer(&["metadata", "annotations", DETAILS_URL]);
+        let path = pointer(&["metadata", "annotations", annotations::DETAILS_URL]);
         let before = current.pointer(&path).cloned();
         if before.as_ref().and_then(Value::as_str) == Some(url) {
             return Ok(());
         }
         self.claim(
             at,
-            &steps("annotations", DETAILS_URL),
-            &shown("annotations", DETAILS_URL),
+            &steps("annotations", annotations::DETAILS_URL),
+            &shown("annotations", annotations::DETAILS_URL),
         )?;
         let operations = before.map_or_else(
-            || set_key(&current, "annotations", DETAILS_URL, url),
+            || set_key(&current, "annotations", annotations::DETAILS_URL, url),
             |before| vec![test(&path, before), replace(&path, json!(url))],
         );
         self.patch(at, operations)
@@ -939,7 +838,7 @@ impl<'a> Planner<'a> {
             .find_map(|(n, read)| (n == name).then_some(read));
         let existing = current.is_some();
         // The image it made last, which the container runs until the next build.
-        let latest = current.and_then(|read| read.status.latest_image);
+        let latest = current.and_then(|read| read.0.status.and_then(|s| s.latest_image));
         let details = self.builds_tab(reference.kind, name);
         let (pushes_to, build_changed) = if existing {
             self.update_build(
@@ -1011,7 +910,7 @@ impl<'a> Planner<'a> {
             .map_err(|e| error(ErrorKind::Invalid, "unreadable_object", e.to_string()))?;
         let reads = read.credentials() == Some(credentials_name(name).as_str());
         let wrote_credentials = self.write_credentials(name, credentials, reads, index)?;
-        let Some(pushes_to) = read.spec.output.image.clone().filter(|i| !i.is_empty()) else {
+        let Some(pushes_to) = read.pushes_to().map(str::to_owned) else {
             return Err(error(
                 ErrorKind::Invalid,
                 "no_output",
@@ -1020,9 +919,9 @@ impl<'a> Planner<'a> {
         };
         // A folder uploaded again keeps building the one it has until the new one is named.
         if let SourceKind::Archive { archive } = &mut source.kind
-            && read.spec.source.kind == "archive"
+            && let Some(uploaded) = read.archive()
         {
-            archive.digest = read.spec.source.archive.and_then(|a| a.digest);
+            archive.digest.clone_from(&uploaded.digest);
         }
         let mut operations = Vec::new();
         for (field, value) in [
@@ -1247,7 +1146,11 @@ impl<'a> Planner<'a> {
             self.delete(&secrets(), &secret, None)?;
         }
         let spec = found.pod_spec();
-        let latest = build.status.latest_image.as_deref();
+        let latest = build
+            .0
+            .status
+            .as_ref()
+            .and_then(|s| s.latest_image.as_deref());
         for container in spec.into_iter().flat_map(|s| &s.containers) {
             let Some(image) = container.image.as_deref() else {
                 continue;

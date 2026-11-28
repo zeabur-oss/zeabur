@@ -60,5 +60,5 @@ deny = [
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
-# zeabur-catalog-format, from Zeabur Catalog's release tag.
-allow-git = ["https://github.com/zeabur-oss/catalog"]
+# zeabur-catalog-format and zeabur-builder-api, from the release tags of Zeabur Catalog and Zeabur Builder.
+allow-git = ["https://github.com/zeabur-oss/catalog", "https://github.com/zeabur-oss/builder"]
