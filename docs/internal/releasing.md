@@ -12,8 +12,9 @@ rehearses: it checks, builds and smokes every platform, and publishes nothing. T
 release, with its title and notes, is made by the Release pull request workflow when it tags.
 
 Jobs that are not per platform run on Instabox (`instabox-small`). The platform builds run on
-GitHub's runners: Linux amd64 and arm64, macOS arm64, Windows for Zeabur Desktop and `zeaburctl`, and
-an Intel Mac for checking `zeaburctl` there.
+GitHub's runners: Linux amd64 and arm64, macOS arm64, and Windows amd64 for Zeabur Desktop and
+`zeaburctl`. The build jobs go by product: `zeabur-build`, `zeaburctl-build` and `desktop-build`.
+Each binary is built once, and `web/dist` once, in `prepare`.
 
 Zeabur Desktop builds in the same workflow, and `publish` waits for it, so nothing is published
 until every package is built (see [Zeabur Desktop](#zeabur-desktop)).
@@ -21,14 +22,14 @@ until every package is built (see [Zeabur Desktop](#zeabur-desktop)).
 | Step | Where | Does |
 |---|---|---|
 | knope's `prepare-release` | once, in the release pull request | Sets the version in every file of `versioned_files` in `knope.toml`: both `Cargo.toml` files, each workspace crate in both lock files and `zeabur-proxy` in the fuzz crate's, the chart's `version` and `web/package.json`. The chart has no `appVersion`; its templates use the chart's `version`. `openapi.yaml` carries the API's own version, which a release does not change. |
-| `check` job | once | The tag is SemVer without build metadata, `CHANGELOG.md` has its section, and a tag is on `main`. |
-| `build` job | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog pin resolves (`release-pins.sh`). Builds the platform (`release-build.sh`; on Linux also Zeabur OSS's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `xtask/pins/zeabur-identity` (`release-smoke.sh`) and writes the image's size and the idle pod's working set to the run's summary. These are the release build's numbers; the CI jobs build with the faster `ci` profile. |
-| `cli-build` job, `scripts/release-build-cli.sh` | Windows amd64; macOS arm64 for the Intel Mac build | `zeaburctl` for Windows (`.zip` with `zeaburctl.exe`) and for Intel Macs, outside the Nix shell like `desktop-build`, with the inputs of `desktop-prepare`, the same nightly through rustup and `cargo-auditable` from crates.io. The Intel build is cross-compiled with Apple's compiler and linker. It compiles, then packs and signs in a step of its own: Azure Artifact Signing (`scripts/azure-signtool.sh`) in the `windows-signing` environment, or `release-sign.sh` in `apple-signing`, on `main` and tags only. CI's nightly `cli-platforms` and `cli-run` jobs run the same scripts, unsigned. |
-| `scripts/release-sign.sh` | macOS arm64, in the `build` and `cli-build` jobs | Signs `zeaburctl` with the Developer ID and notarizes it, in the `apple-signing` environment, on `main` and tags only. Without the certificate it leaves the build as it is and warns. |
-| `publish` job | once, tag only, after every build, `cli-build` too | Refuses when the release is already published. Its token cannot see a draft; the `release` job stops when the release is published. Pushes the images `zeabur` and `proxy`, then the chart with both pinned by digest, and signs them; stops when the chart would run any other image; records the debug and tools images the code pins in `digests.txt`, unsigned, and stops when the registry no longer serves either for both platforms (`release-default-images.sh`) and writes `published/subjects.json`, which `attest` attests. |
+| `prepare` job | once, on Instabox, in the dev shell | The tag is SemVer without build metadata, `CHANGELOG.md` has its section, and a tag is on `main`. On a tag, the catalog pin resolves (`release-pins.sh`). Builds `web/dist` and `desktop/web/dist`, copies the catalog, and names the dev shell's nightly, `tauri-cli` and `cargo-auditable` (`scripts/ci/desktop-inputs.sh`), for every build job. |
+| `zeabur-build` job, `scripts/release-build-zeabur.sh` | Linux amd64 and arm64 | `zeabur` and Zeabur Proxy, and the images of Zeabur OSS and Zeabur Proxy. |
+| `zeaburctl-build` job, `scripts/release-build-zeaburctl.sh` | Linux amd64 and arm64, macOS arm64, Windows amd64 | `zeaburctl`, natively on each platform: in the dev shell on Linux and macOS; on Windows outside it, like `desktop-build`, with the same nightly through rustup and `cargo-auditable` from crates.io. It compiles, then packs and signs in a step of its own: `release-sign.sh` in `apple-signing`, or Azure Artifact Signing (`scripts/azure-signtool.sh`) in `windows-signing`, on `main` and tags only. CI's `zeaburctl-windows` job runs the same script for Windows, unsigned: nightly, and on a pull request that changes how `zeaburctl` builds. |
+| `smoke` job, `scripts/release-smoke.sh` | Linux amd64 and arm64 | Smokes the `zeaburctl` archive, the chart and the image on a k3s cluster with Zeabur Identity at `xtask/pins/zeabur-identity`, and writes the image's size and the idle pod's working set to the run's summary. These are the release build's numbers; the CI jobs build with the faster `ci` profile. |
+| `scripts/release-sign.sh` | macOS arm64, in `zeaburctl-build` | Signs `zeaburctl` with the Developer ID and notarizes it, in the `apple-signing` environment, on `main` and tags only. Without the certificate it leaves the build as it is and warns. |
+| `publish` job | once, tag only, after every build and `smoke` | Refuses when the release is already published. Its token cannot see a draft; the `release` job stops when the release is published. Pushes the images `zeabur` and `proxy`, then the chart with both pinned by digest, and signs them; stops when the chart would run any other image; records the debug and tools images the code pins in `digests.txt`, unsigned, and stops when the registry no longer serves either for both platforms (`release-default-images.sh`) and writes `published/subjects.json`, which `attest` attests. |
 | `release` job | once, tag only | Copies the assets that `release-assets.sh` lists into `assets/`, adds the signed `SHA256SUMS`, attests them and creates the draft release with them, its title and the `CHANGELOG.md` notes (`zeabur-oss-release draft`). A draft that an earlier run left is replaced. |
-| `verify` job, `scripts/release-verify.sh` | every platform | After the workflow has checked `SHA256SUMS` and each asset's attestation, checks that the draft has exactly the expected assets, each image and the chart as a user would, that the chart runs exactly the images in `digests.txt`, and that `digests.txt` names the debug and tools images the code pins (`crates/zeabur-api/src/settings.rs`), then installs the published chart on Linux (`release-smoke.sh`) or runs `zeaburctl` on macOS, where a Developer ID signature must be notarized (`spctl`), and checks Zeabur Desktop's `.dmg` the same way. |
-| `verify-cli` job, `scripts/release-verify-cli.sh` | Windows amd64, macOS amd64 (Intel) | Runs `zeaburctl` from the draft's archive and checks its version, then its Authenticode signature on Windows or its notarization on macOS. An unsigned file only warns. `verify` checks these archives' checksums and attestations. |
+| `verify` job, `scripts/release-verify.sh` | every platform | After the workflow has checked `SHA256SUMS` and each asset's attestation, checks that the draft has exactly the expected assets, each image and the chart as a user would, that the chart runs exactly the images in `digests.txt`, and that `digests.txt` names the debug and tools images the code pins (`crates/zeabur-api/src/settings.rs`), then installs the published chart on Linux (`release-smoke.sh`) or runs `zeaburctl` on macOS, where a Developer ID signature must be notarized (`spctl`), and checks Zeabur Desktop's `.dmg` the same way. On Windows, which has no dev shell, it runs `zeaburctl` from the draft's `.zip` and checks its Authenticode signature (`scripts/release-verify-windows.sh`); an unsigned file only warns. |
 
 The pins come from the releases of zeabur-oss/catalog and zeabur-oss/identity: the `SHA256SUMS` that
 each signed, checked with cosign. Their signer is that repository's own `release.yml` or, for their
@@ -44,8 +45,8 @@ Releases before this one were signed by the shared release workflow of zeabur-os
 
 ## Build files
 
-`scripts/release-build.sh` builds on the platform it runs on, never for another one;
-`scripts/release-build-cli.sh` builds the rest of `zeaburctl` outside the Nix shell. The archive
+`scripts/release-build-zeabur.sh` and `scripts/release-build-zeaburctl.sh` build on the platform
+they run on, never for another one. The archive
 entries carry the commit's time (`scripts/release-pack.sh`), so the same commit gives the same
 archives.
 
@@ -53,10 +54,10 @@ archives.
 |---|---|
 | Linux amd64, arm64 | `zeaburctl-<version>-linux-<arch>.tar.gz` and `zeabur-<version>-linux-<arch>.tar.gz`, one static musl binary each with `LICENSE`; `image.tar` (Zeabur OSS's image) and `proxy-image.tar` (Zeabur Proxy's) |
 | macOS arm64 | `zeaburctl-<version>-darwin-arm64.tar.gz`. The server runs only in a pod, so there is no macOS `zeabur`. |
-| macOS amd64, Windows amd64 (`release-build-cli.sh`) | `zeaburctl-<version>-darwin-amd64.tar.gz` and `zeaburctl-<version>-windows-amd64.zip`, each with `LICENSE`. |
+| Windows amd64 | `zeaburctl-<version>-windows-amd64.zip`, with `zeaburctl.exe` and `LICENSE`. |
 
 `scripts/release-smoke.sh` tries these files as they will ship, on the development cluster
-(`scripts/dev-cluster.sh`). In `build` it runs the local image; in `verify` the node pulls the
+(`scripts/dev-cluster.sh`). In `smoke` it runs the local image; in `verify` the node pulls the
 published one. It never touches your kubeconfig.
 
 ## Zeabur Desktop
@@ -67,9 +68,10 @@ version is the repository's: knope sets `desktop/Cargo.toml` and its lock file, 
 it from there (`desktop/tauri.conf.json` has none). `scripts/check-desktop.sh` fails in CI when it
 differs from the root `Cargo.toml`.
 
+`desktop-build` takes its inputs from `prepare`.
+
 | Job | Where | Does |
 |---|---|---|
-| `desktop-prepare` | Instabox, in the dev shell | Builds `web/dist` and `desktop/web/dist`, copies the catalog, and names the dev shell's nightly and `tauri-cli` (`scripts/ci/desktop-inputs.sh`). |
 | `desktop-build` | macOS arm64, Windows amd64, Linux amd64 and arm64 (Ubuntu 24.04, for its older glibc) | Outside the Nix shell, with the runner's compiler, linker and libraries, the same nightly through rustup and `tauri-cli` from crates.io: compiles the app, then packages and signs it in a step of its own (`scripts/package-desktop.sh`). The compile step fails if the binary links anything from `/nix/store` (`otool -L` on macOS, `readelf -d` on Linux); the packages themselves are not scanned for libraries. |
 | `desktop-updater` | Instabox, `main` and tags, once `desktop/tauri.conf.json` has an updater public key | Signs the `.app.tar.gz`, the `-setup.exe` and the `.AppImage` with `cargo tauri signer sign` and writes `latest.json` from the `.sig` files, with the `CHANGELOG.md` section as its notes (`scripts/desktop-release.ts`). It is the only job in the `desktop-updater` environment, which alone holds the updater key; a build job has one environment, the platform's signing one, so it cannot sign these files. The signature is not checked against `desktop/tauri.conf.json`'s public key before the release; a key that does not match shows when the first update is refused, so test one update after changing the key. |
 
@@ -200,7 +202,7 @@ After publishing a release:
 
 A release is ready when its milestone has no open issue.
 
-The tag must match the manifests that `check` reads, `CHANGELOG.md` must have its section, and
+The tag must match the manifests that `prepare` reads, `CHANGELOG.md` must have its section, and
 the commit must be on `main`; otherwise the run stops before building.
 
 Version 0.1.0 was never published: zeabur-oss withdrew it in every repository, and releases start

@@ -11,7 +11,7 @@
 # the runner's own tools, not the shell's rg or yq. It needs on PATH
 # cargo and rustc of the nightly flake.lock pins and cargo-tauri; in the environment
 # ZEABUR_CATALOG_RELEASE, ZEABUR_CATALOG_COMMIT and ZEABUR_UI_DIST, as the dev shell sets them; and
-# desktop/web/dist built. The desktop-prepare job of .github/workflows/release.yml prepares all of
+# desktop/web/dist built. The prepare job of .github/workflows/release.yml prepares all of
 # this.
 #
 # Signing:

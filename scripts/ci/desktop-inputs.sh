@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # What scripts/package-desktop.sh needs from the dev shell, for a runner that builds outside it
-# (the desktop-prepare job of .github/workflows/release.yml): web/dist, desktop/web/dist and the
+# (the prepare job of .github/workflows/release.yml): web/dist, desktop/web/dist and the
 # catalog in target/desktop-inputs/catalog. Prints the step outputs: the version (VERSION, or the
 # app's), the shell's nightly, tauri-cli and cargo-auditable, the catalog commit and whether the
-# app has an updater key. scripts/release-build-cli.sh uses the same inputs. Runs in
+# app has an updater key. scripts/release-build-zeaburctl.sh uses the same inputs on Windows. Runs in
 # `nix develop .#desktop`.
 set -euo pipefail
 cd "$(dirname "$0")/../.."

@@ -21,11 +21,13 @@ nightly and by hand, where a failure opens or updates the issue "Nightly <job> f
 `zeabur-cluster-tests`.
 
 `.github/workflows/release.yml` runs on a `vX.Y.Z` or `vX.Y.Z-<pre-release>` tag, and rehearses
-without publishing when run by hand. Its jobs are `check` (SemVer, changelog, on `main`), `build`
-(Linux amd64/arm64, macOS arm64: `scripts/release-build.sh`, then `scripts/release-smoke.sh` on
-Linux and `scripts/release-sign.sh` on macOS), `publish`, `attest`, `release` (the draft release,
+without publishing when run by hand. Its jobs are `prepare` (SemVer, changelog, on `main`, the catalog pin,
+`web/dist`), one build job per product: `zeabur-build` (Linux amd64/arm64,
+`scripts/release-build-zeabur.sh`), `zeaburctl-build` (Linux amd64/arm64, macOS arm64, Windows
+amd64: `scripts/release-build-zeaburctl.sh`, which runs `scripts/release-sign.sh` on macOS) and
+`desktop-build`, then `smoke` (`scripts/release-smoke.sh` on Linux), `publish`, `attest`, `release` (the draft release,
 created with the files `scripts/release-assets.sh` lists) and `verify` (`scripts/release-verify.sh` on the
-draft's assets). The `desktop-*` jobs build Zeabur Desktop in the same run; the steps call
+draft's assets). The steps call
 `bun x zeabur-oss-release` (`@zeabur-oss/release`, `package.json`) to push, sign and verify. A failed release run:
 [RELEASE-RECOVERY.md](RELEASE-RECOVERY.md).
 

@@ -56,14 +56,6 @@ export function formula(
       `${indent}sha256 "${sha(checksums, file)}"`,
     ].join("\n");
   };
-  // An older release has no Intel Mac build.
-  const intel = checksums.has(`zeaburctl-${version.tag}-darwin-amd64.tar.gz`)
-    ? `
-    on_intel do
-${build("darwin-amd64", "      ")}
-    end
-`
-    : "";
   return `# frozen_string_literal: true
 
 # Written by scripts/homebrew.ts in zeabur-oss/zeabur for each release; do not edit.
@@ -73,10 +65,12 @@ class ${channel(version).className} < Formula
   license "Apache-2.0"
 
   on_macos do
-${intel ? "" : "    depends_on arch: :arm64\n\n"}    on_arm do
+    depends_on arch: :arm64
+
+    on_arm do
 ${build("darwin-arm64", "      ")}
     end
-${intel}  end
+  end
 
   on_linux do
     on_intel do

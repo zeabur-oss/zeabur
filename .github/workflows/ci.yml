@@ -2,10 +2,12 @@ name: CI
 
 # Each job runs scripts/ci/<job>.sh in the Nix dev shell, the same as locally, except docs, which
 # runs the website's check of docs/ (locally: bun scripts/docs-check.ts <this checkout> in the
-# website), and cli-platforms and cli-run, which run zeaburctl's release scripts outside the shell. Pull requests and pushes run lint, test, ui, desktop and docs. The merge queue runs the jobs that gate a merge on the commit about
+# website), and zeaburctl-windows, which runs zeaburctl's release scripts outside the shell. Pull
+# requests and pushes run lint, test, ui, desktop and docs, and zeaburctl-windows when a pull request
+# changes how zeaburctl builds. The merge queue runs the jobs that gate a merge on the commit about
 # to land. The nightly run runs everything, also fuzz and the canary, which are not in the merge
 # queue, and keeps main's caches for the merge queue's jobs. A failed nightly-only job (fuzz,
-# canary, e2e-full, cli-platforms, cli-run) opens or updates one issue (scripts/nightly-issues.sh),
+# canary, e2e-full, zeaburctl-windows) opens or updates one issue (scripts/nightly-issues.sh),
 # and closes it when the job passes again. Jobs that compile Rust run on instabox-medium, the others on instabox-small.
 on:
   push:
@@ -218,55 +220,73 @@ jobs:
       - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/canary.sh
 
-  # zeaburctl for Windows and Intel Macs as release.yml's cli-build builds it, unsigned, then run
-  # from its archive as release.yml's verify-cli runs it: nightly and by hand. These builds are
-  # outside the Nix shell, which has no Windows toolchain and no Intel Mac one.
-  cli-inputs:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+  # zeaburctl for Windows as release.yml's zeaburctl-build builds it, unsigned, then run from its
+  # archive as release.yml's verify runs it: nightly, by hand, and on a pull request that changes
+  # how it builds. The build is outside the Nix shell, which has no Windows toolchain; this job
+  # prepares what it needs from the shell.
+  zeaburctl-windows-inputs:
+    if: github.event_name != 'merge_group' && !(github.event_name == 'push' && github.ref_type == 'branch')
     runs-on: instabox-small
     timeout-minutes: 30
     outputs:
+      run: ${{ steps.changed.outputs.run }}
       version: ${{ steps.versions.outputs.version }}
       toolchain: ${{ steps.versions.outputs.toolchain }}
       cargo-auditable: ${{ steps.versions.outputs.cargo-auditable }}
       catalog-commit: ${{ steps.versions.outputs.catalog-commit }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: changed
+        name: Whether this run builds zeaburctl for Windows
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          run=true
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            run=false
+            files=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')
+            while read -r file; do
+              case "$file" in
+                scripts/release-build-zeaburctl.sh | scripts/release-pack.sh | \
+                  scripts/azure-signtool.sh | scripts/release-verify-windows.sh | \
+                  .github/workflows/release.yml | .github/workflows/ci.yml) run=true ;;
+              esac
+            done <<<"$files"
+          fi
+          echo "run=$run" >>"$GITHUB_OUTPUT"
+      - if: steps.changed.outputs.run == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@395adf27d31c77538ebf7c154946b52822387b96 # main
-      - uses: ./.github/actions/catalog-release
+      - if: steps.changed.outputs.run == 'true'
+        uses: zeabur-oss/.github/actions/ci-setup@395adf27d31c77538ebf7c154946b52822387b96 # main
+      - if: steps.changed.outputs.run == 'true'
+        uses: ./.github/actions/catalog-release
       - id: versions
+        if: steps.changed.outputs.run == 'true'
         run: nix develop .#desktop -c scripts/ci/desktop-inputs.sh | tee -a "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - if: steps.changed.outputs.run == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: cli-inputs
+          name: zeaburctl-windows-inputs
           path: |
             web/dist/
             target/desktop-inputs/
           if-no-files-found: error
           retention-days: 1
 
-  cli-platforms:
-    name: cli-platforms (${{ matrix.os }}-${{ matrix.arch }})
-    needs: cli-inputs
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { os: windows, arch: amd64, runner: windows-2025, target: x86_64-pc-windows-msvc }
-          - { os: darwin, arch: amd64, runner: macos-26, target: x86_64-apple-darwin }
-    runs-on: ${{ matrix.runner }}
+  zeaburctl-windows:
+    needs: zeaburctl-windows-inputs
+    if: needs.zeaburctl-windows-inputs.outputs.run == 'true'
+    runs-on: windows-2025
     timeout-minutes: 60
     defaults:
       run:
         shell: bash
     env:
-      OS: ${{ matrix.os }}
-      ARCH: ${{ matrix.arch }}
-      VERSION: ${{ needs.cli-inputs.outputs.version }}
-      RUSTUP_TOOLCHAIN: ${{ needs.cli-inputs.outputs.toolchain }}
-      ZEABUR_CATALOG_COMMIT: ${{ needs.cli-inputs.outputs.catalog-commit }}
+      VERSION: ${{ needs.zeaburctl-windows-inputs.outputs.version }}
+      RUSTUP_TOOLCHAIN: ${{ needs.zeaburctl-windows-inputs.outputs.toolchain }}
+      ZEABUR_CATALOG_COMMIT: ${{ needs.zeaburctl-windows-inputs.outputs.catalog-commit }}
       ZEABUR_CATALOG_RELEASE: ${{ github.workspace }}/target/desktop-inputs/catalog
       ZEABUR_UI_DIST: ${{ github.workspace }}/web/dist
     steps:
@@ -275,54 +295,20 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: cli-inputs
+          name: zeaburctl-windows-inputs
       - env:
-          TARGET: ${{ matrix.target }}
-          CARGO_AUDITABLE: ${{ needs.cli-inputs.outputs.cargo-auditable }}
+          CARGO_AUDITABLE: ${{ needs.zeaburctl-windows-inputs.outputs.cargo-auditable }}
         run: |
-          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --target "$TARGET"
+          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
           cargo install cargo-auditable --version "=$CARGO_AUDITABLE" --locked
-      - run: scripts/release-build-cli.sh compile "$VERSION" "$OS" "$ARCH" dist
-      - run: scripts/release-build-cli.sh package "$VERSION" "$OS" "$ARCH" dist
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: cli-${{ matrix.os }}-${{ matrix.arch }}
-          path: dist/
-          if-no-files-found: error
-          retention-days: 3
-
-  cli-run:
-    name: cli-run (${{ matrix.os }}-${{ matrix.arch }})
-    needs: [cli-inputs, cli-platforms]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { os: windows, arch: amd64, runner: windows-2025 }
-          - { os: darwin, arch: amd64, runner: macos-15-intel }
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: cli-${{ matrix.os }}-${{ matrix.arch }}
-          path: downloaded
-      - env:
-          VERSION: ${{ needs.cli-inputs.outputs.version }}
-          OS: ${{ matrix.os }}
-          ARCH: ${{ matrix.arch }}
-        run: scripts/release-verify-cli.sh "$VERSION" "$OS" "$ARCH" downloaded
+      - run: scripts/release-build-zeaburctl.sh compile "$VERSION" windows amd64 dist
+      - run: scripts/release-build-zeaburctl.sh package "$VERSION" windows amd64 dist
+      - run: scripts/release-verify-windows.sh "$VERSION" dist
 
   # One issue for each failing nightly job, opened or updated while it fails, closed when it passes.
   nightly-issues:
     if: always() && github.event_name == 'schedule'
-    needs: [fuzz, canary, e2e-full, cli-platforms, cli-run]
+    needs: [fuzz, canary, e2e-full, zeaburctl-windows]
     runs-on: instabox-small
     timeout-minutes: 120
     permissions:
@@ -349,7 +335,7 @@ jobs:
     name: ci / ok
     if: always()
     needs:
-      [lint, test, ui, desktop, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full, cli-run, docs]
+      [lint, test, ui, desktop, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full, zeaburctl-windows, docs]
     runs-on: instabox-small
     timeout-minutes: 5
     steps:

@@ -12,7 +12,6 @@ const checksums = new Map([
   ["zeaburctl-v0.3.0-darwin-arm64.tar.gz", sum("a")],
   ["zeaburctl-v0.3.0-linux-amd64.tar.gz", sum("b")],
   ["zeaburctl-v0.3.0-linux-arm64.tar.gz", sum("c")],
-  ["zeaburctl-v0.3.0-darwin-amd64.tar.gz", sum("f")],
   ["zeabur-desktop-v0.3.0-darwin-arm64.dmg", sum("d")],
   ["zeabur-desktop-v0.3.0-darwin-arm64.app.tar.gz", sum("e")],
 ]);
@@ -23,7 +22,6 @@ describe("formula", () => {
   test("installs each platform's archive with the checksum SHA256SUMS lists for it", () => {
     for (const [platform, c] of [
       ["darwin-arm64", "a"],
-      ["darwin-amd64", "f"],
       ["linux-amd64", "b"],
       ["linux-arm64", "c"],
     ])
@@ -32,15 +30,6 @@ describe("formula", () => {
           `url "${base}/zeaburctl-v0\\.3\\.0-${platform}\\.tar\\.gz"\\n\\s*sha256 "${sum(c)}"`,
         ),
       );
-  });
-
-  test("runs on Intel Macs too, once the release has their build", () => {
-    expect(rb).not.toContain("depends_on arch: :arm64");
-    const older = new Map(checksums);
-    older.delete("zeaburctl-v0.3.0-darwin-amd64.tar.gz");
-    const old = formula(v, older);
-    expect(old).toContain("depends_on arch: :arm64");
-    expect(old).not.toContain("darwin-amd64");
   });
 
   test("refuses a release whose SHA256SUMS lacks an archive", () => {

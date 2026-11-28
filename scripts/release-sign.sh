@@ -1,23 +1,18 @@
 #!/usr/bin/env bash
 # Signs zeaburctl for macOS with the Developer ID and notarizes it.
 #
-#   scripts/release-sign.sh <vX.Y.Z> <dist> [arm64|amd64]
+#   scripts/release-sign.sh <vX.Y.Z> <dist>
 #
-# The archive is zeaburctl-<vX.Y.Z>-darwin-<arch>.tar.gz in <dist>, arm64 when no arch is given.
-# It runs on a Mac with Apple silicon, in the Nix shell or outside it.
 # Needs APPLE_CERTIFICATE_P12, APPLE_CERTIFICATE_PASSWORD, APPLE_API_KEY_P8, APPLE_API_KEY_ID and
 # APPLE_API_ISSUER_ID. Without the certificate it leaves zeaburctl unsigned and only warns.
 set -euo pipefail
 
-usage="usage: release-sign.sh <vX.Y.Z> <dist> [arm64|amd64]"
+usage="usage: release-sign.sh <vX.Y.Z> <dist>"
 version=${1:?$usage}
 dist=${2:?$usage}
-arch=${3:-arm64}
-root=$(cd "$(dirname "$0")/.." && pwd)
-source "$root/scripts/release-pack.sh"
 
-if [[ "$(uname -sm)" != "Darwin arm64" || ( "$arch" != arm64 && "$arch" != amd64 ) ]]; then
-  echo "$usage, on a Mac with Apple silicon" >&2
+if [[ "$(uname -sm)" != "Darwin arm64" ]]; then
+  echo "only the macOS arm64 build is signed" >&2
   exit 2
 fi
 # Rehearsals and pull requests have no access to the certificate.
@@ -28,7 +23,7 @@ fi
 : "${APPLE_CERTIFICATE_PASSWORD:?}" "${APPLE_API_KEY_P8:?}" "${APPLE_API_KEY_ID:?}"
 : "${APPLE_API_ISSUER_ID:?}"
 
-archive=$(cd "$dist" && pwd)/zeaburctl-$version-darwin-$arch.tar.gz
+archive=$(cd "$dist" && pwd)/zeaburctl-$version-darwin-arm64.tar.gz
 # The Nix shell's codesign is not Apple's, and its SDK has no notarytool.
 unset DEVELOPER_DIR SDKROOT
 
@@ -64,13 +59,9 @@ import_certificate() {
     -k "$password" "$keychain" >/dev/null
 }
 
-# Bash's own match: this runs outside the Nix shell too, without rg.
 developer_id() {
-  local identities pattern='\) ([0-9A-F]{40}) "Developer ID Application: '
-  identities=$(/usr/bin/security find-identity -v -p codesigning "$keychain")
-  if [[ "$identities" =~ $pattern ]]; then
-    echo "${BASH_REMATCH[1]}"
-  fi
+  /usr/bin/security find-identity -v -p codesigning "$keychain" |
+    rg -m 1 -o -r '$1' '\) ([0-9A-F]{40}) "Developer ID Application: ' || true
 }
 
 # A bare executable cannot hold the notarization ticket; Gatekeeper looks it up online.
@@ -113,12 +104,11 @@ fi
   --keychain "$keychain" --sign "$identity" "$zeaburctl"
 /usr/bin/codesign --verify --strict --verbose=2 "$zeaburctl"
 notarize "$zeaburctl"
-# The Intel build is checked where it runs, in the release's verify-cli job.
-if [[ "$arch" == arm64 ]]; then
-  "$zeaburctl" --version
-fi
+"$zeaburctl" --version
 
-# Pack the archive again the same way as the build, so it stays reproducible.
-SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)
-export SOURCE_DATE_EPOCH
-pack "$work/zeaburctl" "$archive" LICENSE zeaburctl
+# Pack the archive again the same way as release-build-zeaburctl.sh, so it stays reproducible.
+commit_time=$(git show -s --format=%ct HEAD)
+tar --format=ustar --sort=name --mtime="@$commit_time" \
+  --owner=0 --group=0 --numeric-owner \
+  -C "$work/zeaburctl" -cf - LICENSE zeaburctl |
+  gzip -n -9 >"$archive"

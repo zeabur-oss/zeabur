@@ -5,7 +5,7 @@ cases.
 
 ## A pin without a release tag
 
-`check` or `build` says `zeabur-oss/catalog <commit> has no release tag that a pre-release can
+`prepare` says `zeabur-oss/catalog <commit> has no release tag that a pre-release can
 pin: tag it, or move the pin`. After a tag, that version is spent. Release the catalog first, move
 `flake.lock` to that release in a pull request, then release the next version. A normal release pins only normal releases, so a beta catalog
 stops it too.
@@ -28,6 +28,6 @@ rebuild the release for it.
 ## macOS builds
 
 A macOS binary that links a library from `/nix/store` would fail on every Mac without Nix:
-`release-build.sh` refuses any library outside `/usr/lib` and `/System/Library`, and points
+`release-build-zeaburctl.sh` refuses any library outside `/usr/lib` and `/System/Library`, and points
 `libiconv` (Rust's standard library links it) at the system's copy. Read `otool -L` of the binary
 in the failed build before changing that list.

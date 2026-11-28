@@ -5,22 +5,16 @@
 #
 # Packs the files of <dir> into <archive>, a .tar.gz or a .zip by its name, so the same files give
 # the same archive: entries in the order given (give them sorted), SOURCE_DATE_EPOCH as each one's
-# time, no owner names, no gzip timestamp. GNU tar in the Nix shell; macOS's bsdtar and Windows'
-# tar.exe on a runner outside it.
+# time, no owner names, no gzip timestamp. A .tar.gz with GNU tar, in the Nix shell; a .zip with
+# Windows' tar.exe.
 pack() {
   local dir=$1 archive=$2
   shift 2
   : "${SOURCE_DATE_EPOCH:?set SOURCE_DATE_EPOCH to the commit time}"
   case "$archive" in
     *.tar.gz)
-      if [[ "$(tar --version)" == *'GNU tar'* ]]; then
-        tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" \
-          --owner=0 --group=0 --numeric-owner -C "$dir" -cf - "$@" | gzip -n -9 >"$archive"
-      else
-        (cd "$dir" && TZ=UTC touch -t "$(TZ=UTC date -r "$SOURCE_DATE_EPOCH" +%Y%m%d%H%M.%S)" "$@")
-        tar --format ustar --uid 0 --gid 0 --uname "" --gname "" --no-xattrs --no-mac-metadata \
-          -C "$dir" -cf - "$@" | gzip -n -9 >"$archive"
-      fi
+      tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" \
+        --owner=0 --group=0 --numeric-owner -C "$dir" -cf - "$@" | gzip -n -9 >"$archive"
       ;;
     *.zip)
       # Git Bash's tar is GNU tar, which cannot write a zip.
