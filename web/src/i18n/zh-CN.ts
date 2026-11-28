@@ -1171,10 +1171,14 @@ export const zhCN: Messages = {
   "components.gitopsHow":
     "集群用 Flux 或 Argo CD 管理的话，改用下面的命令输出组件的 manifest，再提交到集群读取的仓库。",
   "components.manage": "管理",
-  "components.incomplete": "还没装完",
+  "components.incomplete": "安装未完成",
   "components.unstarted": (steps) => `${steps} 还没开始，点“管理”把它装完。`,
   "components.installing": "安装中…",
   "components.removing": "移除中…",
+  "components.hide": "隐藏",
+  "components.progress": (step, steps) => `第 ${step} 步，共 ${steps} 步`,
+  "components.installDone": "已安装",
+  "components.installStopped": "停下来了，打开看原因。",
   "components.installed": "已安装，健康检查都通过了。",
   "components.removed": "已移除。",
   "components.untested": (name) => `Zeabur Catalog 还没在这类集群上测试过 ${name}。`,
@@ -2216,6 +2220,7 @@ export const zhCN: Messages = {
   "clusterBackups.coverage.projectMethod": "用 Velero 备份到 S3，在下方设置。",
   "clusterBackups.coverage.installed": (name) => `${name} 已安装`,
   "clusterBackups.coverage.install": (name) => `安装 ${name}`,
+  "clusterBackups.coverage.unfinished": (name) => `${name} 安装未完成`,
   "clusterBackups.notInstalled": "备份需要 Velero",
   "clusterBackups.notInstalledBody":
     "Velero 会按定时把集群的对象和卷里的文件复制到 S3 兼容存储。先到“组件”安装，再回来这里设置。",

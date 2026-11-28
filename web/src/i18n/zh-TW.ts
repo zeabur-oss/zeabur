@@ -1174,10 +1174,14 @@ export const zhTW: Messages = {
   "components.gitopsHow":
     "叢集用 Flux 或 Argo CD 管理的話，改用下面的指令印出元件的 manifest，再提交到叢集讀取的儲存庫。",
   "components.manage": "管理",
-  "components.incomplete": "還沒裝完",
+  "components.incomplete": "安裝未完成",
   "components.unstarted": (steps) => `${steps} 還沒開始，按「管理」把它裝完。`,
   "components.installing": "安裝中…",
   "components.removing": "移除中…",
+  "components.hide": "隱藏",
+  "components.progress": (step, steps) => `第 ${step} 步，共 ${steps} 步`,
+  "components.installDone": "已安裝",
+  "components.installStopped": "停下來了，打開看原因。",
   "components.installed": "已安裝，健康檢查都通過了。",
   "components.removed": "已移除。",
   "components.untested": (name) => `Zeabur Catalog 還沒在這類叢集上測試過 ${name}。`,
@@ -2220,6 +2224,7 @@ export const zhTW: Messages = {
   "clusterBackups.coverage.projectMethod": "用 Velero 備份到 S3，在下方設定。",
   "clusterBackups.coverage.installed": (name) => `${name} 已安裝`,
   "clusterBackups.coverage.install": (name) => `安裝 ${name}`,
+  "clusterBackups.coverage.unfinished": (name) => `${name} 安裝未完成`,
   "clusterBackups.notInstalled": "備份需要 Velero",
   "clusterBackups.notInstalledBody":
     "Velero 依排程備份叢集：物件和磁碟區裡的檔案都存到 S3 相容儲存。先到「元件」安裝，再回來這裡設定。",

@@ -1,11 +1,11 @@
 // Installing or removing a catalog component: the plan's steps, then each step applied in turn
 // while the page waits for the one before it to be ready.
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
 
 import type { Schemas } from "@/api/client"
-import { applyComponent, planComponent } from "@/api/zeabur"
-import { capabilitiesQuery, refresh, reviewOnce } from "@/api/queries"
+import { planComponent } from "@/api/zeabur"
+import { reviewOnce } from "@/api/queries"
 import { Command } from "@/components/bits"
 import { InputsForm, InputsReview, isMissing, type Values } from "@/components/component-inputs"
 import { Frame } from "@/components/members/frame"
@@ -15,12 +15,10 @@ import { StatusPill } from "@/components/status"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"
+import { dismissInstall, installOf, installs, startInstall } from "@/lib/installs"
 import { useNow } from "@/lib/page-visible"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
-
-/** How long the page waits before it asks the server to go on. */
-const POLL_MS = 3_000
 
 const health = {
   pending: "idle",
@@ -41,12 +39,13 @@ const planQuery = (id: string, action: Schemas.ComponentAction, values: Values =
  * open, so a failed install is tried again rather than removed. Once Zeabur wrote a step, the
  * install dialog also offers removal, for an install that cannot finish. An installed component
  * is offered removal when its install plan is refused, such as when a dependency was removed,
- * and new values when its component asks for any. */
+ * and new values when its component asks for any. An install this tab runs goes on when the
+ * dialog closes, and the dialog shows it again when it opens. */
 export function ComponentPlan({
   id,
   name,
   installed,
-  onClose,
+  onClose: close,
 }: {
   id: string
   name: string
@@ -54,7 +53,13 @@ export function ComponentPlan({
   onClose: () => void
 }) {
   const install = useQuery(planQuery(id, "install"))
-  const [action, setAction] = useState<Schemas.ComponentAction>()
+  const [action, setAction] = useState<Schemas.ComponentAction | undefined>(
+    () => installOf(installs.get(), id)?.action,
+  )
+  const onClose = () => {
+    dismissInstall(id)
+    close()
+  }
   const [editing, setEditing] = useState(false)
   if (action === undefined && install.data) setAction(install.data.done ? "remove" : "install")
   const changeValues = () => {
@@ -153,9 +158,12 @@ function PlanDialog({
   onEdit?: () => void
 }) {
   const t = useT()
-  const [values, setValues] = useState<Values>({})
+  const [values, setValues] = useState<Values>(() => {
+    const install = installOf(installs.get(), id)
+    return install?.action === action ? install.values : {}
+  })
   const plan = useQuery(planQuery(id, action, values))
-  const { shown, running, start, apply } = useApplying(id, action, values, plan.data)
+  const { shown, running, start, error } = useApplying(id, name, action, values, plan.data)
   const form = useInputs(shown, running, editing, setValues)
   return (
     <Frame
@@ -192,7 +200,7 @@ function PlanDialog({
         error={plan.isError ? plan.error : undefined}
         plan={form.asking ? undefined : shown}
       />
-      {apply.isError ? <Problem error={apply.error} /> : null}
+      {error ? <Problem error={error} /> : null}
       <GitOpsExport id={id} action={action} plan={shown} />
     </Frame>
   )
@@ -273,40 +281,24 @@ function PlanContent({
   return plan ? <PlanBody name={name} plan={plan} /> : null
 }
 
-/** Applies the plan's next step, then asks again every few seconds until the plan is done or a
- * step or health check failed. An apply's plan shows only while the values it sent stay the same. */
+/** The install this tab runs for the component, while it has the action and values the dialog
+ * shows: its plan replaces the dialog's own once it applied a step. */
 function useApplying(
   id: string,
+  name: string,
   action: Schemas.ComponentAction,
   values: Values,
   planned: Schemas.ComponentPlan | undefined,
 ) {
-  const [running, setRunning] = useState(false)
-  const [latest, setLatest] = useState<{ plan: Schemas.ComponentPlan; values: Values }>()
-  const apply = useMutation({
-    mutationFn: (version: string) =>
-      applyComponent(id, { action, catalogVersion: version, values }),
-    onSuccess: ({ plan: next }) => {
-      setLatest({ plan: next, values })
-      if (next.done || [...next.steps, ...next.checks].some((s) => s.state === "failed")) {
-        setRunning(false)
-        void refresh(capabilitiesQuery)
-      }
-    },
-    onError: () => setRunning(false),
-  })
-  const shown = latest?.values === values ? latest.plan : planned
-  useEffect(() => {
-    if (!running || apply.isPending || !shown || shown.done) return
-    const timer = setTimeout(() => apply.mutate(shown.catalogVersion), POLL_MS)
-    return () => clearTimeout(timer)
-  }, [running, apply, shown])
-
-  const start = (version: string) => {
-    setRunning(true)
-    apply.mutate(version)
+  const install = installOf(installs.useValue(), id)
+  const mine = install?.action === action && install.values === values ? install : undefined
+  const start = (version: string) => startInstall({ id, name, action, values }, version)
+  return {
+    shown: mine?.plan ?? planned,
+    running: mine?.running ?? false,
+    start,
+    error: mine?.error,
   }
-  return { shown, running, start, apply }
 }
 
 /** The footer button of each action: before it starts, and while it runs. */
@@ -346,7 +338,7 @@ function Footer({
   return (
     <>
       <Button variant="ghost" size="sm" onClick={onClose}>
-        {t("plan.cancel")}
+        {t(running ? "components.hide" : "plan.cancel")}
       </Button>
       {onRemove ? (
         <Button variant="outline" size="sm" onClick={onRemove}>
